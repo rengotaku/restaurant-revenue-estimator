@@ -1,9 +1,10 @@
 """画面 (ARCHITECTURE 6.2 節)."""
 
 import json
+import re
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session
@@ -20,6 +21,7 @@ from restaurant_revenue_estimator.models import Run, Scenario
 from restaurant_revenue_estimator.repositories.scenario_repo import (
     RunRepository,
     ScenarioRepository,
+    is_default_run,
 )
 from restaurant_revenue_estimator.services.evaluation import EvaluationRequest, plain
 from restaurant_revenue_estimator.services.evaluation_service import (
@@ -55,25 +57,95 @@ def _ctx(**kwargs: Any) -> dict[str, Any]:
     context: dict[str, Any] = {
         "stores": list_stores(data_directory()),
         "store_id": None,
+        "banner": None,
+        "error": None,
+        "floor2_candidates": [],
+        "floor2_choice": "",
+        "floor2_four": "",
+        "floor2_two": "",
+        "selected_overrides": {},
+        "selected_scenario": None,
+        "has_run": False,
+        "run_id": None,
     }
     context.update(kwargs)
     return context
 
 
-def _render(request: Request, template: str, **kwargs: Any) -> HTMLResponse:
+def _render(
+    request: Request, template: str, status_code: int = 200, **kwargs: Any
+) -> HTMLResponse:
     assert templates is not None
-    return templates.TemplateResponse(request, template, _ctx(**kwargs))
+    return templates.TemplateResponse(
+        request, template, _ctx(**kwargs), status_code=status_code
+    )
 
 
-def _latest_run(session: Session, store_id: str) -> Run:
-    run = RunRepository(session).latest(store_id)
+def _floor2_candidates(inputs: StoreInputs) -> list[str]:
+    layout = inputs.files.get("layout.yaml", {}) or {}
+    candidates: list[str] = []
+    floors = layout.get("floors", [])
+    if isinstance(floors, list):
+        for floor in floors:
+            if isinstance(floor, dict) and floor.get("id") == "2f":
+                tables = floor.get("tables")
+                if isinstance(tables, dict):
+                    cand_dict = tables.get("candidates") or {}
+                    candidates = list(cand_dict.keys())
+    return candidates
+
+
+def _parse_table_count(raw: str) -> int | None:
+    text = raw.strip()
+    if not text:
+        return 0
+    if not re.fullmatch(r"[0-9]+", text):
+        return None
+    val = int(text)
+    return val if val >= 0 else None
+
+
+def _banner_text(session: Session, run: Run) -> str | None:
+    if is_default_run(run):
+        return None
+    if run.scenario_id is not None:
+        scenario = ScenarioRepository(session).get(run.scenario_id)
+        name = scenario.name if scenario else str(run.scenario_id)
+        return f"シナリオ『{name}』の試算"
+    try:
+        data = json.loads(run.result_json)
+        overrides = data.get("meta", {}).get("overrides", {})
+        if overrides:
+            keys = ", ".join(sorted(overrides.keys()))
+            return f"未保存の試算（上書き: {keys}）"
+    except Exception:
+        pass
+    return "未保存の試算"
+
+
+def _resolve_run(
+    session: Session, store_id: str, run_id: int | None = None
+) -> tuple[Run, str | None]:
+    repository = RunRepository(session)
+    if run_id is not None:
+        run = repository.get(run_id)
+        if run is None or run.store_id != store_id:
+            raise HTTPException(status_code=404, detail=f"実行が無いか別店舗: {run_id}")
+        return run, _banner_text(session, run)
+
+    run = repository.latest_default(store_id)
     if run is None:
         run = execute_run(
             session,
             data_directory(),
             store_id,
-            RunRequest(replications=2),
+            RunRequest(replications=20, seed=42),
         )
+    return run, None
+
+
+def _latest_run(session: Session, store_id: str) -> Run:
+    run, _ = _resolve_run(session, store_id, None)
     return run
 
 
@@ -104,7 +176,7 @@ def index(request: Request, session: Session = Depends(get_session)) -> HTMLResp
     repository = RunRepository(session)
     latest: dict[str, dict[str, Any]] = {}
     for store in stores:
-        run = repository.latest(store["store_id"])
+        run = repository.latest_default(store["store_id"])
         if run is not None:
             result = _run_result(run)
             latest[store["store_id"]] = {
@@ -117,19 +189,23 @@ def index(request: Request, session: Session = Depends(get_session)) -> HTMLResp
 
 @router.get("/stores/{store_id}", response_class=HTMLResponse)
 def store_summary(
-    request: Request, store_id: str, session: Session = Depends(get_session)
+    request: Request,
+    store_id: str,
+    run: int | None = None,
+    session: Session = Depends(get_session),
 ) -> HTMLResponse:
     inputs = _get_store(store_id)
     summary = summarize(inputs)
-    run = _latest_run(session, store_id)
-    result = _run_result(run)
+    selected_run, banner = _resolve_run(session, store_id, run)
+    result = _run_result(selected_run)
     return _render(
         request,
         "stores/summary.html",
         store_id=store_id,
         summary=summary,
-        run=run,
+        run=selected_run,
         result=result,
+        banner=banner,
     )
 
 
@@ -158,10 +234,11 @@ def store_revenue(
     request: Request,
     store_id: str,
     tax: str = "inc",
+    run: int | None = None,
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
-    run = _latest_run(session, store_id)
-    result = _run_result(run)
+    selected_run, banner = _resolve_run(session, store_id, run)
+    result = _run_result(selected_run)
     months = result["revenue"]["months"]
     key = "total_inc_tax" if tax == "inc" else "total_ex_tax"
     chart = {
@@ -177,6 +254,8 @@ def store_revenue(
         total=result["revenue"][key],
         tax=tax,
         chart=json.dumps(chart, ensure_ascii=False),
+        banner=banner,
+        run_id=run,
     )
 
 
@@ -275,17 +354,21 @@ def _floor_view(inputs: Any) -> list[dict[str, Any]]:
 
 @router.get("/stores/{store_id}/layout", response_class=HTMLResponse)
 def store_layout(
-    request: Request, store_id: str, session: Session = Depends(get_session)
+    request: Request,
+    store_id: str,
+    run: int | None = None,
+    session: Session = Depends(get_session),
 ) -> HTMLResponse:
     inputs = _get_store(store_id)
-    run = _latest_run(session, store_id)
-    result = _run_result(run)
+    selected_run, banner = _resolve_run(session, store_id, run)
+    result = _run_result(selected_run)
     return _render(
         request,
         "stores/layout.html",
         store_id=store_id,
         floor_rows=_floor_view(inputs),
         result=result,
+        banner=banner,
     )
 
 
@@ -322,16 +405,36 @@ def store_simulator(
     inputs = _get_store(store_id)
     keys = _writable_keys(inputs, "standard")
     scenarios = ScenarioRepository(session).list(store_id)
-    selected_run = (
-        RunRepository(session).get(run) if run else _latest_run(session, store_id)
-    )
+    selected_run, banner = _resolve_run(session, store_id, run)
     result = _run_result(selected_run) if selected_run else None
     selected_scenario = None
     selected_overrides: dict[str, Any] = {}
+    floor2_choice: str = ""
+    floor2_four: int | str = ""
+    floor2_two: int | str = ""
+
     if scenario is not None:
         selected_scenario = ScenarioRepository(session).get(scenario)
         if selected_scenario is not None:
             selected_overrides = json.loads(selected_scenario.overrides_json)
+            f2 = selected_overrides.get("layout.floor2")
+            if isinstance(f2, str):
+                floor2_choice = f2
+            elif isinstance(f2, list):
+                floor2_choice = "custom"
+                four_cnt = sum(
+                    1
+                    for item in f2
+                    if isinstance(item, dict) and item.get("seats") == 4
+                )
+                two_cnt = sum(
+                    1
+                    for item in f2
+                    if isinstance(item, dict) and item.get("seats") == 2
+                )
+                floor2_four = four_cnt
+                floor2_two = two_cnt
+
     return _render(
         request,
         "stores/simulator.html",
@@ -342,16 +445,12 @@ def store_simulator(
         saved=saved,
         selected_scenario=selected_scenario,
         selected_overrides=selected_overrides,
-        floor2_four=sum(
-            1
-            for item in selected_overrides.get("layout.floor2", [])
-            if isinstance(item, dict) and item.get("seats") == 4
-        ),
-        floor2_two=sum(
-            1
-            for item in selected_overrides.get("layout.floor2", [])
-            if isinstance(item, dict) and item.get("seats") == 2
-        ),
+        floor2_candidates=_floor2_candidates(inputs),
+        floor2_choice=floor2_choice,
+        floor2_four=floor2_four,
+        floor2_two=floor2_two,
+        banner=banner,
+        has_run=run is not None,
     )
 
 
@@ -360,7 +459,7 @@ async def submit_simulator(
     request: Request,
     store_id: str,
     session: Session = Depends(get_session),
-) -> RedirectResponse:
+) -> Response:
     form = await request.form()
     inputs = _get_store(store_id)
     overrides: dict[str, Any] = {}
@@ -375,17 +474,42 @@ async def submit_simulator(
             value = int(value)
         overrides[item["key"]] = value
 
-    four = str(form.get("floor2_4p", "")).strip()
-    two = str(form.get("floor2_2p", "")).strip()
-    if four or two:
+    floor2_choice = str(form.get("floor2_choice", "")).strip()
+    if floor2_choice == "custom":
+        raw_4p = str(form.get("floor2_4p", "")).strip()
+        raw_2p = str(form.get("floor2_2p", "")).strip()
+        count_4p = _parse_table_count(raw_4p)
+        count_2p = _parse_table_count(raw_2p)
+        if count_4p is None or count_2p is None or (count_4p + count_2p == 0):
+            error_msg = "自由入力では 0 以上の整数を入力し、1 卓以上入れる"
+            selected_run = RunRepository(session).latest_default(store_id)
+            result = _run_result(selected_run) if selected_run else None
+            return _render(
+                request,
+                "stores/simulator.html",
+                status_code=200,
+                store_id=store_id,
+                keys=_writable_keys(inputs, "standard"),
+                scenarios=ScenarioRepository(session).list(store_id),
+                result=result,
+                saved=False,
+                error=error_msg,
+                floor2_candidates=_floor2_candidates(inputs),
+                floor2_choice="custom",
+                floor2_four=raw_4p,
+                floor2_two=raw_2p,
+                banner=None,
+            )
         tables = [
             {"id": f"2f-4-{index}", "seats": 4}
-            for index in range(int(four) if four else 0)
+            for index in range(count_4p)
         ] + [
             {"id": f"2f-2-{index}", "seats": 2}
-            for index in range(int(two) if two else 0)
+            for index in range(count_2p)
         ]
         overrides["layout.floor2"] = tables
+    elif floor2_choice != "":
+        overrides["layout.floor2"] = floor2_choice
 
     replications = int(str(form.get("replications", "20")))
     scenario_id = str(form.get("scenario_id", "")).strip()
@@ -396,8 +520,9 @@ async def submit_simulator(
         replications = int(str(form.get("replications", "20")))
 
     name = str(form.get("name", "")).strip()
+    saved_scenario = None
     if name:
-        ScenarioRepository(session).add(
+        saved_scenario = ScenarioRepository(session).add(
             Scenario(
                 store_id=store_id,
                 name=name,
@@ -408,24 +533,39 @@ async def submit_simulator(
             )
         )
 
+    target_scenario_id = (
+        saved_scenario.id
+        if saved_scenario
+        else (int(scenario_id) if scenario_id else None)
+    )
     run = execute_run(
         session,
         data_directory(),
         store_id,
-        RunRequest(replications=replications, overrides=overrides),
+        RunRequest(
+            scenario_id=target_scenario_id,
+            replications=replications,
+            overrides=overrides,
+        ),
     )
+    redirect_url = f"/stores/{store_id}/simulator?run={run.id}"
+    if name:
+        redirect_url += "&saved=1"
     return RedirectResponse(
-        url=f"/stores/{store_id}/simulator?run={run.id}&saved=1", status_code=303
+        url=redirect_url, status_code=303
     )
 
 
 @router.get("/stores/{store_id}/costs", response_class=HTMLResponse)
 def store_costs(
-    request: Request, store_id: str, session: Session = Depends(get_session)
+    request: Request,
+    store_id: str,
+    run: int | None = None,
+    session: Session = Depends(get_session),
 ) -> HTMLResponse:
     inputs = _get_store(store_id)
-    run = _latest_run(session, store_id)
-    result = _run_result(run)
+    selected_run, banner = _resolve_run(session, store_id, run)
+    result = _run_result(selected_run)
     assumptions = inputs.files.get("assumptions/standard.yaml", {}) or {}
     part_time = assumptions.get("part_time_staff", {})
     runtime_overrides = result.get("meta", {}).get("overrides", {}) or {}
@@ -454,6 +594,7 @@ def store_costs(
         assumptions=assumptions,
         warnings=warnings,
         jfc=jfc,
+        banner=banner,
     )
 
 
