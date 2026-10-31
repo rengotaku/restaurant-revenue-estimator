@@ -1,0 +1,62 @@
+store_id: birdman_tamachi
+
+name:
+  value: バードマン田町店
+  unit: text
+  status: PUBLIC_VERIFIED
+  sources: [S01]
+
+address:
+  value: 東京都港区芝5-14-9
+  unit: text
+  status: PUBLIC_VERIFIED
+  sources: [S01, S04]
+
+phone:
+  value: "03-6809-4585"
+  unit: text
+  status: PUBLIC_VERIFIED
+  sources: [S01, S04]
+
+external_ids:
+  tabelog:
+    value: "13134326"
+    unit: id
+    status: PUBLIC_VERIFIED
+    sources: [S01]
+
+listed_seats:
+  value: 65
+  unit: seats
+  status: PUBLIC_VERIFIED
+  sources: [S01]
+  note: "食べログの席数欄。注記に「2号店 30席」があるが、これは別住所の姉妹店を指す（FND-3）"
+
+floor2_seats:
+  value: null
+  unit: seats
+  status: UNRESOLVED
+  candidates:
+    f2_42: 43
+    f2_12: 13
+    f2_22: 22
+  note: "65 席の解釈なら 43、35 席（65-30）の解釈なら 13（FND-3）"
+  how_to_verify: "2 階の卓数を現地で数える（4 人卓・2 人卓の別）"
+
+smoking:
+  value: "1階禁煙・2階喫煙（観察）。店の表記は「ランチ・ディナー共に分煙」"
+  unit: text
+  status: OBSERVED
+  observation_id: OBS-001
+
+related_stores:
+  - name: バードマン TRIO 田町店
+    relation: sister
+    included: false
+    address: 東京都港区芝5-23-8
+    phone: "03-3455-5538"
+    external_ids:
+      tabelog: "13119788"
+    seats: 30
+    source: S01b
+    note: "本店とは住所も電話も別。本店の席数・貸切人数に混ぜない（spec 2.3）"

@@ -1,0 +1,42 @@
+sources:
+  - id: S05
+    url: https://tabelog.com/tokyo/A1310/A131001/13025447/
+    accessed_at: 2026-10-30
+    published_at: 2026-10-03
+    facts:
+      - 住所は千代田区神田佐久間町2-17、電話は03-5820-0388
+      - 150席、3フロア
+      - 1F禁煙、2F・3Fは加熱式たばこのみ
+      - 月〜土 16:00-23:20、日祝 16:00-23:00、年中無休・年末年始休み
+      - 席料お通し代なし
+      - 3Fは掘りごたつ座敷 最大54名、16名〜部分貸切
+    license_status: unknown
+    body_stored: false
+
+  - id: S06
+    url: https://torahachi.jp/store/akihabara/
+    accessed_at: 2026-10-30
+    facts:
+      - 住所・電話・席数は食べログと一致
+      - コースは 4,500 円（7品・150分飲み放題）、5,000 円（9品・150分）、4,000 円（5品・120分）
+      - いずれも税込
+    license_status: unknown
+    body_stored: false
+
+  - id: S07
+    url: https://www.gourmetcaree.jp/kanto/shop/127471/374921
+    accessed_at: 2026-10-30
+    facts:
+      - 正社員 月給 317,000 円〜、アルバイト 時給 1,330 円〜（掲載文の要約）
+    license_status: unknown
+    body_stored: false
+    note: "403 で本文を確認できなかった（FND-8）"
+
+  - id: S08
+    url: https://www.gourmetcaree.jp/kanto/detail/127471/374921/23_3
+    accessed_at: 2026-10-30
+    facts:
+      - 求人詳細（403 で本文を確認できなかった）
+    license_status: unknown
+    body_stored: false
+    note: "403 で本文を確認できなかった（FND-8）"

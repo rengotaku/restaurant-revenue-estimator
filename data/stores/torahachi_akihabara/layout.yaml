@@ -1,0 +1,59 @@
+floors:
+  value: null
+  unit: floors
+  status: UNRESOLVED
+  candidates:
+    each_50:
+      - id: "1f"
+        name: 1階
+        open_policy: always
+        tables:
+          - {id: 1f-1, seats: 4}
+          - {id: 1f-2, seats: 4}
+          - {id: 1f-3, seats: 4}
+          - {id: 1f-4, seats: 4}
+          - {id: 1f-5, seats: 4}
+          - {id: 1f-6, seats: 4}
+          - {id: 1f-7, seats: 4}
+          - {id: 1f-8, seats: 4}
+          - {id: 1f-9, seats: 4}
+          - {id: 1f-10, seats: 4}
+          - {id: 1f-11, seats: 4}
+          - {id: 1f-12, seats: 4}
+          - {id: 1f-13, seats: 2}
+      - id: "2f"
+        name: 2階
+        open_policy: when_lower_full
+        tables:
+          - {id: 2f-1, seats: 4}
+          - {id: 2f-2, seats: 4}
+          - {id: 2f-3, seats: 4}
+          - {id: 2f-4, seats: 4}
+          - {id: 2f-5, seats: 4}
+          - {id: 2f-6, seats: 4}
+          - {id: 2f-7, seats: 4}
+          - {id: 2f-8, seats: 4}
+          - {id: 2f-9, seats: 4}
+          - {id: 2f-10, seats: 4}
+          - {id: 2f-11, seats: 4}
+          - {id: 2f-12, seats: 4}
+          - {id: 2f-13, seats: 2}
+      - id: "3f"
+        name: 3階（掘りごたつ座敷）
+        open_policy: when_lower_full
+        tables:
+          - {id: 3f-1, seats: 4}
+          - {id: 3f-2, seats: 4}
+          - {id: 3f-3, seats: 4}
+          - {id: 3f-4, seats: 4}
+          - {id: 3f-5, seats: 4}
+          - {id: 3f-6, seats: 4}
+          - {id: 3f-7, seats: 4}
+          - {id: 3f-8, seats: 4}
+          - {id: 3f-9, seats: 4}
+          - {id: 3f-10, seats: 4}
+          - {id: 3f-11, seats: 4}
+          - {id: 3f-12, seats: 4}
+          - {id: 3f-13, seats: 2}
+  note: "フロア別の卓構成は公開情報に無い。各フロア 50 席・4人卓×12 + 2人卓×1 を 1 候補として置く（#21 で現地確認するまで確定しない）"
+  how_to_verify: "各フロアの卓数と席数を現地で数える"

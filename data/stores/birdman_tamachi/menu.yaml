@@ -1,0 +1,100 @@
+menu_items:
+  lunch:
+    value:
+      - {name: ローストポーク丼, price: 1100}
+      - {name: あい盛り, price: 1100}
+      - {name: 唐揚げセット, price: 1100}
+      - {name: しょうが焼き定食, price: 1100}
+      - {name: 唐揚げ定食, price: 1200}
+    unit: yen
+    status: PUBLIC_VERIFIED
+    sources: [S02]
+    note: "税込。2026-02-02 更新"
+
+courses:
+  sumibi:
+    name: 炭火焼鳥会席
+    normal_price:
+      value: 6500
+      unit: yen
+      status: PUBLIC_VERIFIED
+      sources: [S01c]
+    discounted_price:
+      value: 5500
+      unit: yen
+      status: PUBLIC_VERIFIED
+      sources: [S01c]
+    min_guests: 3
+    max_guests: 26
+    duration_minutes:
+      value: 120
+      unit: minutes
+      status: PUBLIC_VERIFIED
+      sources: [S01c]
+    includes_drink:
+      value: true
+      unit: bool
+      status: PUBLIC_VERIFIED
+      sources: [S01c]
+
+  oyama:
+    name: 大山どり満喫
+    normal_price:
+      value: 7000
+      unit: yen
+      status: PUBLIC_VERIFIED
+      sources: [S01c]
+    discounted_price:
+      value: 6000
+      unit: yen
+      status: PUBLIC_VERIFIED
+      sources: [S01c]
+    min_guests: 3
+    max_guests: 26
+    duration_minutes:
+      value: 120
+      unit: minutes
+      status: PUBLIC_VERIFIED
+      sources: [S01c]
+    includes_drink:
+      value: true
+      unit: bool
+      status: PUBLIC_VERIFIED
+      sources: [S01c]
+
+  niku:
+    name: 肉三昧
+    normal_price:
+      value: 8000
+      unit: yen
+      status: PUBLIC_VERIFIED
+      sources: [S01c]
+    discounted_price:
+      value: 7000
+      unit: yen
+      status: PUBLIC_VERIFIED
+      sources: [S01c]
+    min_guests: 3
+    max_guests: 10
+    duration_minutes:
+      value: 120
+      unit: minutes
+      status: PUBLIC_VERIFIED
+      sources: [S01c]
+    includes_drink:
+      value: true
+      unit: bool
+      status: PUBLIC_VERIFIED
+      sources: [S01c]
+
+appetizer:
+  price:
+    value: 450
+    unit: yen
+    status: PUBLIC_VERIFIED
+    sources: [S03]
+  waived_for_course:
+    value: true
+    unit: bool
+    status: PUBLIC_VERIFIED
+    sources: [S03]

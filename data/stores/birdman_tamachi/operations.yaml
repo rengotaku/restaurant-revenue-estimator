@@ -1,0 +1,68 @@
+rules:
+  value:
+  - id: current
+    effective_from: null
+    effective_to: null
+    open_weekdays:
+    - mon
+    - tue
+    - wed
+    - thu
+    - fri
+    open_on_holidays: false
+    lunch:
+      open: '11:30'
+      close: '13:30'
+      last_order: '13:00'
+      last_entry: '13:00'
+    dinner:
+      open: '17:30'
+      close: '22:30'
+      last_order: '22:00'
+      last_entry: '21:30'
+  unit: rules
+  status: PUBLIC_VERIFIED
+  sources:
+  - S01
+saturday_closure_start:
+  value: null
+  unit: date
+  status: UNRESOLVED
+  candidates:
+    '2025-09-01': 前年から土曜定休
+    '2026-09-01': 2026年9月から土曜定休
+  note: 公開ページに年が無い（FND-4）
+  how_to_verify: 店頭の掲示・求人票・電話で開始時期を確認する
+saturday_hours_before_closure:
+  value: null
+  unit: rules
+  status: UNRESOLVED
+  candidates:
+    same_as_weekday:
+      lunch:
+        open: '11:30'
+        close: '13:30'
+        last_order: '13:00'
+        last_entry: '13:00'
+      dinner:
+        open: '17:30'
+        close: '22:30'
+        last_order: '22:00'
+        last_entry: '21:30'
+    dinner_only:
+      dinner:
+        open: '17:30'
+        close: '22:30'
+        last_order: '22:00'
+        last_entry: '21:30'
+  note: 土曜定休より前の土曜の営業時間は公開情報に無い
+  how_to_verify: 過去の求人票や店頭の掲示で確認する
+exceptions:
+  value: []
+  unit: days
+  status: ASSUMPTION
+  justification: 年末年始の休業日は公開情報に日付が無い。v5 の 240 日を説明する 4 日（1/2, 12/29-31）は推定なので、既定では入れない
+  range:
+    low: []
+    base: []
+    high: []

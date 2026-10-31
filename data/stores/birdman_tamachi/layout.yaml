@@ -1,0 +1,61 @@
+floors:
+  - id: "1f"
+    name: 1階
+    open_policy:
+      value: always
+      unit: policy
+      status: ASSUMPTION
+      justification: "1 階から案内するのが自然。観察でも 1 階が先に埋まっている"
+      range: {low: always, base: always, high: always}
+    tables:
+      value:
+        - {id: 1f-1, seats: 4}
+        - {id: 1f-2, seats: 4}
+        - {id: 1f-3, seats: 4}
+        - {id: 1f-4, seats: 4}
+        - {id: 1f-5, seats: 4}
+        - {id: 1f-6, seats: 2}
+      unit: tables
+      status: OBSERVED
+      observation_id: OBS-001
+      note: "4人卓×5 + 2人卓×1。22 席・6 卓（spec T01）"
+
+  - id: "2f"
+    name: 2階
+    open_policy:
+      value: when_lower_full
+      unit: policy
+      status: ASSUMPTION
+      justification: "1 階が満卓のときに 2 階へ案内しているという観察に合わせる"
+      range: {low: never, base: when_lower_full, high: always}
+    tables:
+      value: null
+      unit: tables
+      status: UNRESOLVED
+      candidates:
+        f2_42:
+          - {id: 2f-1, seats: 4}
+          - {id: 2f-2, seats: 4}
+          - {id: 2f-3, seats: 4}
+          - {id: 2f-4, seats: 4}
+          - {id: 2f-5, seats: 4}
+          - {id: 2f-6, seats: 4}
+          - {id: 2f-7, seats: 4}
+          - {id: 2f-8, seats: 4}
+          - {id: 2f-9, seats: 4}
+          - {id: 2f-10, seats: 4}
+          - {id: 2f-11, seats: 2}
+        f2_12:
+          - {id: 2f-1, seats: 4}
+          - {id: 2f-2, seats: 4}
+          - {id: 2f-3, seats: 2}
+          - {id: 2f-4, seats: 2}
+        f2_22:
+          - {id: 2f-1, seats: 4}
+          - {id: 2f-2, seats: 4}
+          - {id: 2f-3, seats: 4}
+          - {id: 2f-4, seats: 4}
+          - {id: 2f-5, seats: 4}
+          - {id: 2f-6, seats: 2}
+      note: "65 席（2階43席）・35 席（2階13席）・中間の 22 席の 3 解釈（FND-3）"
+      how_to_verify: "2 階の卓構成を現地で数える"

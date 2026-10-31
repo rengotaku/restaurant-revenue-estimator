@@ -1,0 +1,36 @@
+kind: legacy_scenario
+is_actual: false
+label: v5（過去の試算。実績ではない）
+year: 2026
+unit: 万円
+note: >-
+  spec 3.1 の月別表。日別の元入力は残っていないため、この表の算術と暦との差だけを検査する。
+  新しい計算の入力には使わない（ARCHITECTURE 4.2 節）。
+
+months:
+  - {month: 1, business_days: 19, lunch: 156, dinner: 348, reported: 504}
+  - {month: 2, business_days: 18, lunch: 156, dinner: 349, reported: 505}
+  - {month: 3, business_days: 21, lunch: 202, dinner: 522, reported: 724}
+  - {month: 4, business_days: 21, lunch: 200, dinner: 523, reported: 723}
+  - {month: 5, business_days: 18, lunch: 162, dinner: 376, reported: 538}
+  - {month: 6, business_days: 22, lunch: 205, dinner: 462, reported: 667}
+  - {month: 7, business_days: 22, lunch: 208, dinner: 517, reported: 725}
+  - {month: 8, business_days: 20, lunch: 159, dinner: 365, reported: 524}
+  - {month: 9, business_days: 19, lunch: 178, dinner: 419, reported: 597}
+  - {month: 10, business_days: 21, lunch: 200, dinner: 504, reported: 703}
+  - {month: 11, business_days: 19, lunch: 181, dinner: 460, reported: 641}
+  - {month: 12, business_days: 20, lunch: 190, dinner: 540, reported: 729}
+
+totals:
+  business_days: 240
+  lunch: 2197
+  dinner: 5385
+  reported: 7580
+
+cost_summary:
+  gross_revenue_ex_tax: 6891
+  food_cost: 2274
+  labor_cost: 2343
+  rent: 960
+  other: 758
+  operating_surplus: 556
