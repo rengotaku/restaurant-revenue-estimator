@@ -159,7 +159,7 @@ course_ratio:
     base: 0.35
     high: 0.5
   how_to_verify: コース予約の人数を 1 か月分集計する
-  value: 0.5
+  value: 0.35
 discount_application_rate:
   unit: ratio
   status: ASSUMPTION
@@ -434,7 +434,7 @@ course_ratio_month_effect:
     - -0.5
     - -0.5
     - -0.5
-    base:
+    base: &id_crm_opt
     - 0.0
     - 0.0
     - 0.0
@@ -447,7 +447,7 @@ course_ratio_month_effect:
     - 0.0
     - 0.0
     - 0.0
-    high: &id_crm_opt
+    high:
     - 0.5
     - 0.5
     - 0.5
@@ -475,7 +475,7 @@ course_ratio_weekday_effect:
       fri: -0.5
       sat: -0.5
       sun: -0.5
-    base:
+    base: &id_crw_opt
       mon: 0.0
       tue: 0.0
       wed: 0.0
@@ -483,7 +483,7 @@ course_ratio_weekday_effect:
       fri: 0.0
       sat: 0.0
       sun: 0.0
-    high: &id_crw_opt
+    high:
       mon: 0.5
       tue: 0.5
       wed: 0.5
