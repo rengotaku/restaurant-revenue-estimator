@@ -45,7 +45,7 @@ lunch_stay_minutes:
     low: 30
     base: 40
     high: 55
-  value: 30
+  value: 55
 cleanup_minutes:
   unit: minutes
   status: ASSUMPTION
@@ -54,7 +54,7 @@ cleanup_minutes:
     low: 3
     base: 5
     high: 10
-  value: 3
+  value: 10
 max_wait_minutes:
   unit: minutes
   status: ASSUMPTION
