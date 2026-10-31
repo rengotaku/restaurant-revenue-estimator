@@ -4,6 +4,7 @@ import json
 
 from sqlmodel import Session, select
 
+from restaurant_revenue_estimator import code_version
 from restaurant_revenue_estimator.models import Run, Scenario
 
 
@@ -63,7 +64,13 @@ class RunRepository:
         calendar_mode: str,
         year: int,
         scenario_id: int | None = None,
+        code_sha256: str | None = None,
     ) -> Run | None:
+        target_code_sha256 = (
+            code_sha256
+            if code_sha256 is not None
+            else code_version.current_code_sha256()
+        )
         statement = select(Run).where(
             Run.store_id == store_id,
             Run.input_hash == input_hash,
@@ -73,6 +80,7 @@ class RunRepository:
             Run.calendar_mode == calendar_mode,
             Run.year == year,
             Run.scenario_id == scenario_id,
+            Run.code_sha256 == target_code_sha256,
         )
         return self.session.exec(statement).first()
 
@@ -95,7 +103,14 @@ class RunRepository:
         statement = statement.order_by(Run.created_at.desc())  # type: ignore[attr-defined]
         return self.session.exec(statement).first()
 
-    def latest_default(self, store_id: str) -> Run | None:
+    def latest_default(
+        self, store_id: str, code_sha256: str | None = None
+    ) -> Run | None:
+        target_code_sha256 = (
+            code_sha256
+            if code_sha256 is not None
+            else code_version.current_code_sha256()
+        )
         statement = (
             select(Run)
             .where(
@@ -104,6 +119,7 @@ class RunRepository:
                 Run.scenario_id.is_(None),  # type: ignore[union-attr]
                 Run.calendar_mode == "steady",
                 Run.year == 2026,
+                Run.code_sha256 == target_code_sha256,
             )
             .order_by(Run.created_at.desc())  # type: ignore[attr-defined]
         )
@@ -111,4 +127,3 @@ class RunRepository:
             if is_default_run(run):
                 return run
         return None
-

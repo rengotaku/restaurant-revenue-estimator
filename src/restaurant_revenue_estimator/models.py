@@ -39,6 +39,7 @@ class Run(SQLModel, table=True):
     replications: int = Field(default=20)
     input_hash: str = Field(index=True, max_length=64)
     model_version: str = Field(default="", max_length=20)
+    code_sha256: str = Field(default="", max_length=64)
     calendar_sha256: str = Field(default="", max_length=64)
     result_json: str = Field(default="{}")
     report_md: str = Field(default="")
