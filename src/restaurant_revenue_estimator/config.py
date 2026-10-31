@@ -1,5 +1,6 @@
 """アプリケーション設定: pydantic-settings で env を解決する."""
 
+import os
 from pathlib import Path
 
 from pydantic import Field
@@ -22,14 +23,13 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO")
     log_json: bool = Field(default=False)
 
+    # 自分の PC でだけ使う前提。0.0.0.0 では待ち受けない (ADR 0002)。
+    host: str = Field(default="127.0.0.1")
+    port: int = Field(default=8000)
+
     database_url: str = Field(
         default=f"sqlite:///{_BASE_DIR / 'restaurant_revenue_estimator.db'}",
     )
-
-    jwt_secret: str = Field(default="dev-secret-change-me-in-production-32+")
-    jwt_algorithm: str = Field(default="HS256")
-    jwt_expire_minutes: int = Field(default=60 * 24)
-    session_cookie_name: str = Field(default="session")
 
 
 _settings: Settings | None = None
@@ -41,6 +41,11 @@ def get_settings() -> Settings:
     if _settings is None:
         _settings = Settings()
     return _settings
+
+
+def data_directory() -> Path:
+    """入力 YAML の置き場所. テストでは RRE_DATA_DIR で差し替える."""
+    return Path(os.environ.get("RRE_DATA_DIR", str(_BASE_DIR / "data")))
 
 
 def reset_settings() -> None:

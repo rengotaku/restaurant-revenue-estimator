@@ -29,11 +29,7 @@ def _extract_target_section(content: str, target: str) -> str:
             section.append(line)
             continue
         if in_section:
-            if (
-                line.startswith("\t")
-                or line.startswith("@")
-                or line.strip() == ""
-            ):
+            if line.startswith("\t") or line.startswith("@") or line.strip() == "":
                 section.append(line)
             else:
                 break
@@ -69,9 +65,7 @@ class TestRunTargetUvicornFlags:
         assert match, f"uvicorn 起動行が見つからない: {section}"
 
         # 環境変数を展開: $$_port → 8000 / $(PORT) → 8000
-        args_str = match.group(1).replace("$$_port", "8000").replace(
-            "$(PORT)", "8000"
-        )
+        args_str = match.group(1).replace("$$_port", "8000").replace("$(PORT)", "8000")
         args = args_str.split()
 
         result = subprocess.run(
@@ -86,8 +80,7 @@ class TestRunTargetUvicornFlags:
             f"uvicorn が拒否したフラグが含まれる: stderr={result.stderr}"
         )
         assert result.returncode == 0, (
-            f"uvicorn --help 実行失敗: rc={result.returncode}, "
-            f"stderr={result.stderr}"
+            f"uvicorn --help 実行失敗: rc={result.returncode}, stderr={result.stderr}"
         )
 
 
@@ -96,9 +89,7 @@ class TestCheckVenvScript:
 
     def test_script_exists(self) -> None:
         """check_venv.py が存在する."""
-        assert CHECK_VENV_SCRIPT.exists(), (
-            f"{CHECK_VENV_SCRIPT} が存在しない"
-        )
+        assert CHECK_VENV_SCRIPT.exists(), f"{CHECK_VENV_SCRIPT} が存在しない"
 
     def test_script_is_executable(self) -> None:
         """check_venv.py が実行可能 (shebang つき)."""
@@ -141,8 +132,7 @@ class TestCheckVenvScript:
             check=False,
         )
         assert result.returncode == 0, (
-            f"working venv で 0 を期待: rc={result.returncode}, "
-            f"stderr={result.stderr}"
+            f"working venv で 0 を期待: rc={result.returncode}, stderr={result.stderr}"
         )
 
     def test_returns_nonzero_for_broken_venv(self, tmp_path: Path) -> None:
@@ -152,9 +142,7 @@ class TestCheckVenvScript:
         venv_bin = tmp_path / ".venv" / "bin"
         venv_bin.mkdir(parents=True)
         # 存在しないパスへのシンボリックリンク (壊れた shebang を再現)
-        (venv_bin / "python").symlink_to(
-            "/nonexistent/path/python-broken-shebang"
-        )
+        (venv_bin / "python").symlink_to("/nonexistent/path/python-broken-shebang")
 
         result = subprocess.run(
             [sys.executable, str(CHECK_VENV_SCRIPT)],
@@ -164,9 +152,7 @@ class TestCheckVenvScript:
             timeout=10,
             check=False,
         )
-        assert result.returncode != 0, (
-            "broken venv は非0 を期待"
-        )
+        assert result.returncode != 0, "broken venv は非0 を期待"
 
 
 class TestInstallTargetSelfHeals:

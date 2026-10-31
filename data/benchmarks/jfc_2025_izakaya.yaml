@@ -1,0 +1,26 @@
+benchmark_id: jfc_2025_izakaya
+name: 日本政策金融公庫「小企業の経営指標調査」2025 年度 酒場・ビヤホール
+source:
+  id: S20
+  url: https://www.jfc.go.jp/n/findings/pdf/sme_findings2_08a.pdf
+  accessed_at: 2026-10-30
+definition_note: >-
+  売上高は原則として消費税を含む。人件費は役員報酬・退職金・福利厚生費を含む。
+  対象は公庫が 2025 年 4〜12 月に融資した法人企業（調査対象 212、黒字かつ自己資本プラス 74）。
+  このシステムの入力とは分母・範囲が違うため、入力には使わず、推計結果を同じ定義に換算して照合する。
+metrics:
+  gross_profit_ratio:
+    label: 売上高総利益率
+    average: 0.678
+    profitable_average: null
+    note: 原価率 32.2% の裏返し
+  labor_ratio:
+    label: 人件費対売上高比率
+    average: 0.322
+    profitable_average: null
+    note: 役員報酬を含む
+  operating_margin:
+    label: 売上高営業利益率
+    average: -0.018
+    profitable_average: 0.044
+    note: 黒字かつ自己資本プラス企業の平均は 4.4%、中央値は -0.1%

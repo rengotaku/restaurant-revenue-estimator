@@ -1,0 +1,64 @@
+sources:
+  - id: S01
+    url: https://tabelog.com/tokyo/A1314/A131402/13134326/
+    accessed_at: 2026-10-30
+    published_at: 2026-10-03
+    facts:
+      - 住所は港区芝5-14-9、電話は03-6809-4585
+      - 席数は65席（2号店30席の注記あり）
+      - 月〜金 11:30-13:30（L.O. 13:00）、17:30-22:30（L.O. 22:00）、土日祝休み
+      - お通し450円（コース予約時を除く）
+      - ランチ・ディナー共に分煙
+    license_status: unknown
+    body_stored: false
+
+  - id: S01b
+    url: https://tabelog.com/tokyo/A1314/A131402/13119788/
+    accessed_at: 2026-10-30
+    facts:
+      - バードマン TRIO 田町店。住所は港区芝5-23-8、電話は03-3455-5538
+      - 30席、着席最大26人
+    license_status: unknown
+    body_stored: false
+    note: 姉妹店。本店の値の根拠には使わない
+
+  - id: S01c
+    url: https://tabelog.com/tokyo/A1314/A131402/13134326/party/
+    accessed_at: 2026-10-30
+    facts:
+      - 炭火焼鳥会席 通常6,500円・割引5,500円（3〜26名）
+      - 大山どり満喫 通常7,000円・割引6,000円（3〜26名）
+      - 肉三昧 通常8,000円・割引7,000円（3〜10名）
+      - いずれも税込・2時間飲み放題付き
+      - 2.5時間延長は無料だが金曜・祝前日は不可
+      - プレミアム飲み放題は+500円
+    license_status: unknown
+    body_stored: false
+
+  - id: S02
+    url: https://tabelog.com/tokyo/A1314/A131402/13134326/dtlmenu/lunch/
+    accessed_at: 2026-10-30
+    published_at: 2026-02-02
+    facts:
+      - ローストポーク丼・あい盛り・唐揚げセット・しょうが焼き定食は各1,100円
+      - 唐揚げ定食は1,200円
+      - すべて税込
+    license_status: unknown
+    body_stored: false
+
+  - id: S03
+    url: https://tabelog.com/tokyo/A1314/A131402/13134326/dtlmenu/
+    accessed_at: 2026-10-30
+    published_at: 2026-10-03
+    facts:
+      - お通し450円、コース予約時は除く
+    license_status: unknown
+    body_stored: false
+
+  - id: S04
+    url: https://yoyaku.toreta.in/birdman
+    accessed_at: 2026-10-30
+    facts:
+      - 貸切やコース予約は直接店舗へ電話（03-6809-4585）
+    license_status: unknown
+    body_stored: false

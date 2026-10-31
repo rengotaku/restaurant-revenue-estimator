@@ -16,10 +16,18 @@
 雛形は [my-boilerplate/python-web](https://github.com/rengotaku/my-boilerplate/tree/main/boilerplates/python-web)。操作は Makefile 経由で行う。
 
 ```bash
-make help
-make install
-make run
-make ci
+make help        # ターゲット一覧
+make install     # Python (uv sync) と Node.js の依存を入れる
+make run         # 127.0.0.1:8000 で開発サーバ (Tailwind watch つき)
+make test        # pytest
+make test-cov    # pytest + カバレッジ
+make check       # lint + typecheck
+make ci          # lint + typecheck + test-cov
+make build       # Tailwind CSS を minify
+make format      # ruff format + ruff check --fix
+make migrate     # Alembic のマイグレーションを適用
 ```
+
+CLI は `uv run rre --version` で動く。
 
 CI は `.github/workflows/ci.yml`。

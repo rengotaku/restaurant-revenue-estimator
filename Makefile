@@ -21,7 +21,7 @@ run: _build-assets
 	fi; \
 	echo "Starting Tailwind CSS watch + uvicorn dev server on port $$_port..."; \
 	npx @tailwindcss/cli -i static/css/input.css -o static/css/style.css --watch & \
-	uv run uvicorn restaurant_revenue_estimator.app:app --reload --host 0.0.0.0 --port $$_port
+	uv run uvicorn restaurant_revenue_estimator.app:app --reload --host 127.0.0.1 --port $$_port
 
 ## lint: Run ruff linter
 lint:
@@ -88,6 +88,11 @@ _copy-alpine:
 		cp node_modules/alpinejs/dist/cdn.min.js static/js/alpine.js; \
 	else \
 		echo "Warning: node_modules not found, skipping Alpine.js copy (run 'npm install' first)"; \
+	fi
+	@if [ -f node_modules/chart.js/dist/chart.umd.js ]; then \
+		cp node_modules/chart.js/dist/chart.umd.js static/js/chart.js; \
+	else \
+		echo "Warning: chart.js not found, skipping Chart.js copy (run 'npm install' first)"; \
 	fi
 
 _build-assets: _copy-alpine

@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}シミュレーター - {{ store_id }}{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold text-gray-800 mb-4">シミュレーター</h1>
+
+{% if saved %}<p class="mb-4 text-sm text-green-700">保存しました。</p>{% endif %}
+
+{% if result %}
+<section class="bg-white rounded-lg shadow p-4 mb-6">
+    <h2 class="font-bold text-gray-800 mb-2">実行結果</h2>
+    <dl class="grid gap-2 md:grid-cols-3 text-sm">
+        <div><dt class="text-gray-500">年間税込売上</dt><dd class="font-medium">{{ "{:,}".format(result.revenue.total_inc_tax) }} 円</dd></div>
+        <div><dt class="text-gray-500">事業所得相当</dt><dd class="font-medium">{{ "{:,}".format(result.pnl.business_income) }} 円</dd></div>
+        <div><dt class="text-gray-500">replications</dt><dd class="font-medium">{{ result.run.replications if result.run else '—' }}</dd></div>
+        <div><dt class="text-gray-500">昼の入店客数（月）</dt><dd>{{ result.simulation.lunch_guests_by_weekday.get('mon', '—') }} 人</dd></div>
+        <div><dt class="text-gray-500">昼の失った需要</dt><dd>{{ "%.1f"|format(result.simulation.lost_lunch_guests) }} 人/日</dd></div>
+        <div><dt class="text-gray-500">2 階</dt><dd>{{ result.variant }}</dd></div>
+    </dl>
+</section>
+{% endif %}
+
+<form method="post" class="bg-white rounded-lg shadow p-4 mb-6">
+    <h2 class="font-bold text-gray-800 mb-1">仮定を変える</h2>
+    <p class="text-xs text-gray-500 mb-4">
+        事実（OBSERVED・PUBLIC_VERIFIED・PUBLIC_REPORTED）はここでは変えられない。事実は YAML を直して PR にする。
+    </p>
+    <datalist id="scenario-list"></datalist>
+    <div class="grid gap-3 md:grid-cols-2">
+        {% for item in keys %}
+        <div class="border rounded p-3">
+            <label class="block text-sm font-medium" for="key_{{ item.key }}">{{ item.key }}</label>
+            <p class="text-xs text-gray-500">{{ item.status }} / 現在 {{ item.value }}</p>
+            {% if item.scalar %}
+            <input id="key_{{ item.key }}" name="key_{{ item.key }}" type="number" step="any"
+                   class="mt-1 w-full border rounded px-2 py-1 text-sm"
+                   value="{{ selected_overrides.get(item.key, '') }}" placeholder="{{ item.value }}">
+            {% else %}
+            <p class="mt-1 text-xs text-gray-400">表・分布のため画面からは変えない（YAML で扱う）</p>
+            {% endif %}
+            {% if item.range.low is defined and item.scalar %}
+            <p class="text-xs text-gray-400 mt-1">low {{ item.range.low }} / base {{ item.range.base }} / high {{ item.range.high }}</p>
+            {% endif %}
+            {% if item.how_to_verify %}<p class="text-xs text-gray-400 mt-1">確かめ方: {{ item.how_to_verify }}</p>{% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <fieldset class="border rounded p-3 mt-4">
+        <legend class="text-sm font-medium px-1">2 階の卓構成（UNRESOLVED）</legend>
+        <div class="flex flex-wrap gap-4 text-sm">
+            <label>4 人卓 <input name="floor2_4p" type="number" min="0" class="border rounded px-2 py-1 w-20" value="{{ floor2_four }}"></label>
+            <label>2 人卓 <input name="floor2_2p" type="number" min="0" class="border rounded px-2 py-1 w-20" value="{{ floor2_two }}"></label>
+        </div>
+    </fieldset>
+
+    <div class="grid gap-3 md:grid-cols-2 mt-4">
+        <label class="text-sm">replications
+            <select name="replications" class="border rounded px-2 py-1">
+                <option value="20">速い（20）</option>
+                <option value="200">通常（200）</option>
+            </select>
+        </label>
+        <label class="text-sm">シナリオとして保存する名前（空なら保存しない）
+            <input name="name" class="border rounded px-2 py-1 w-full" placeholder="例: 2階6卓案">
+        </label>
+        <label class="text-sm md:col-span-2">メモ
+            <input name="note" class="border rounded px-2 py-1 w-full">
+        </label>
+    </div>
+
+    <button type="submit" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">実行する</button>
+</form>
+
+{% if scenarios %}
+<section class="bg-white rounded-lg shadow p-4">
+    <h2 class="font-bold text-gray-800 mb-2">保存済みシナリオ</h2>
+    <ul class="text-sm space-y-1">
+        {% for scenario in scenarios %}
+        <li>
+            <a class="text-blue-700 hover:underline" href="/stores/{{ store_id }}/simulator?scenario={{ scenario.id }}">{{ scenario.name }}</a>
+            <span class="text-gray-500 text-xs">{{ scenario.note }}</span>
+        </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
+{% endblock %}

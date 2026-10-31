@@ -20,11 +20,16 @@ dependencies = [
     "python-multipart>=0.0.12",
     "sqlmodel>=0.0.22",
     "alembic>=1.14.0",
-    "pyjwt>=2.10.0",
-    "pwdlib[argon2]>=0.2.1",
-    "structlog>=25.1.0",
+    "pydantic>=2.0.0",
     "pydantic-settings>=2.7.0",
+    "pyyaml>=6.0.0",
+    "numpy>=2.0.0",
+    "typer>=0.15.0",
+    "structlog>=25.1.0",
 ]
+
+[project.scripts]
+rre = "restaurant_revenue_estimator.cli:app"
 
 [project.optional-dependencies]
 dev = [
@@ -33,6 +38,7 @@ dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
     "httpx>=0.27.0",
+    "types-pyyaml>=6.0.0",
 ]
 
 [tool.ruff]
@@ -60,10 +66,18 @@ ignore = [
     "PLR0913",  # Too many arguments
     "PLR2004",  # Magic value comparison
     "B008",     # FastAPI Depends() in argument defaults (standard FastAPI pattern)
+    "RUF001",   # 日本語の全角括弧・記号を許す
+    "RUF003",   # 同上（コメント内）
+    "RUF002",   # 同上（docstring 内）
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["ARG", "PLR2004"]
+# 長い日本語の f-string は分割すると読みにくい
+"src/restaurant_revenue_estimator/report/markdown.py" = ["E501"]
+"src/restaurant_revenue_estimator/inputs/legacy.py" = ["E501"]
+# docs/ の調査スクリプトは成果物の再現用。日本語の全角括弧や長い行を許す。
+"docs/*" = ["B905", "E501", "E741", "PLR0915", "PTH123", "RUF001"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -79,7 +93,7 @@ source = ["src/restaurant_revenue_estimator"]
 branch = true
 relative_files = true
 omit = [
-    "src/myweb/alembic/*",
+    "src/restaurant_revenue_estimator/alembic/*",
 ]
 
 [tool.coverage.report]

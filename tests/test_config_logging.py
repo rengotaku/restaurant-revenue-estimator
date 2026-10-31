@@ -14,15 +14,16 @@ class TestSettings:
         s = Settings()
         assert s.app_env == "development"
         assert s.log_level == "INFO"
-        assert s.jwt_algorithm == "HS256"
+        assert s.host == "127.0.0.1"
+        assert s.port == 8000
         assert "sqlite" in s.database_url
 
     def test_env_override(self, monkeypatch: MonkeyPatch) -> None:
         monkeypatch.setenv("APP_ENV", "production")
-        monkeypatch.setenv("JWT_SECRET", "from-env")
+        monkeypatch.setenv("HOST", "127.0.0.2")
         s = Settings()
         assert s.app_env == "production"
-        assert s.jwt_secret == "from-env"
+        assert s.host == "127.0.0.2"
 
     def test_get_settings_singleton(self) -> None:
         reset_settings()
@@ -43,4 +44,4 @@ class TestLogging:
     def test_logger_can_log(self, caplog: LogCaptureFixture) -> None:
         configure_logging()
         with caplog.at_level(logging.INFO):
-            get_logger("myweb.test").info("hello", key="value")
+            get_logger("rre.test").info("hello", key="value")

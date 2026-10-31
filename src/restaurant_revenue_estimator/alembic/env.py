@@ -1,4 +1,4 @@
-"""Alembic 環境設定: SQLModel メタデータと myweb.config を統合する."""
+"""Alembic 環境設定: SQLModel メタデータとアプリ設定を統合する."""
 
 from logging.config import fileConfig
 

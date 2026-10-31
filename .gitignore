@@ -31,9 +31,18 @@ node_modules/
 # Build outputs
 static/css/style.css
 static/js/alpine.js
+static/js/chart.js
 
 # Database
 *.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# CLI の出力
+runs/
 
 # IDE
 .idea/

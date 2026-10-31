@@ -1,0 +1,348 @@
+lunch_avg_ticket:
+  unit: yen
+  status: ASSUMPTION
+  justification: spec 9.5 の仮置き。ランチメニュー 1,100〜1,200 円の範囲内
+  range:
+    low: 1100
+    base: 1130
+    high: 1200
+  how_to_verify: 昼の客単価を POS かレシートで 1 週間分集計する
+  value: 1130
+lunch_arrival_groups:
+  unit: groups
+  status: ASSUMPTION
+  justification: 仮置き。12:00-12:30 に 40% が集まる形を base にする（spec 9.5）
+  range:
+    low: 30
+    base: 45
+    high: 60
+  how_to_verify: 12:00-12:30 の入店組数を 3 日分数える
+  value: 45
+group_size_distribution:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 観察「4 人卓に 2 人組が多い」に合わせた仮置き
+  range:
+    low:
+      1: 0.3
+      2: 0.55
+      3: 0.1
+      4: 0.05
+    base: &id001
+      1: 0.25
+      2: 0.5
+      3: 0.15
+      4: 0.1
+    high:
+      1: 0.2
+      2: 0.55
+      3: 0.15
+      4: 0.1
+  how_to_verify: 入店する組の人数を 30 組分数える
+  value: *id001
+lunch_stay_minutes:
+  unit: minutes
+  status: ASSUMPTION
+  justification: spec 9.5 の仮置き
+  range:
+    low: 30
+    base: 40
+    high: 55
+  how_to_verify: 着席から退店までの時間を 10 組分測る
+  value: 40
+cleanup_minutes:
+  unit: minutes
+  status: ASSUMPTION
+  justification: spec 6.4 の仮定 5 分
+  range:
+    low: 3
+    base: 5
+    high: 10
+  how_to_verify: 退店から次の案内までの時間を測る
+  value: 5
+max_wait_minutes:
+  unit: minutes
+  status: ASSUMPTION
+  justification: 仮置き。待ちの上限を超えたら帰るとする
+  range:
+    low: 5
+    base: 10
+    high: 20
+  how_to_verify: 行列に並んだ組が待つ時間を測る
+  value: 10
+dinner_demand_by_weekday:
+  unit: people/day
+  status: ASSUMPTION
+  justification: v5 の曜日別仮定（spec 3.2-3）。月と金以外は v5 に値が無いため直線で補った仮置き
+  range:
+    low:
+      mon: 22
+      tue: 28
+      wed: 31
+      thu: 35
+      fri: 43
+      sat: 0
+      sun: 0
+    base: &id002
+      mon: 32
+      tue: 40
+      wed: 45
+      thu: 50
+      fri: 61
+      sat: 0
+      sun: 0
+    high:
+      mon: 42
+      tue: 52
+      wed: 58
+      thu: 65
+      fri: 79
+      sat: 0
+      sun: 0
+  how_to_verify: 曜日別の夜の入店客数を POS で 1 か月分集計する
+  value: *id002
+dinner_seasonality:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 12 月が最も高く 2 月が最も低いという調査（S18）を参考にした仮置き。月別指数は非公開
+  range:
+    low:
+    - 0.9025
+    - 0.855
+    - 0.9215
+    - 0.95
+    - 0.969
+    - 0.95
+    - 0.9785
+    - 0.95
+    - 0.95
+    - 0.95
+    - 0.9975
+    - 1.0925
+    base: &id003
+    - 0.95
+    - 0.9
+    - 0.97
+    - 1.0
+    - 1.02
+    - 1.0
+    - 1.03
+    - 1.0
+    - 1.0
+    - 1.0
+    - 1.05
+    - 1.15
+    high:
+    - 0.9975
+    - 0.945
+    - 1.0185
+    - 1.05
+    - 1.071
+    - 1.05
+    - 1.0815
+    - 1.05
+    - 1.05
+    - 1.05
+    - 1.1025
+    - 1.2075
+  how_to_verify: 月別の客数を 1 年分集計する
+  value: *id003
+dinner_ala_ticket:
+  unit: yen
+  status: ASSUMPTION
+  justification: spec 9.5 の仮置き。食べログの夜予算 4,000〜4,999 円の範囲
+  range:
+    low: 4000
+    base: 4500
+    high: 5000
+  how_to_verify: 夜のアラカルト客の客単価を POS で集計する
+  value: 4500
+course_ratio:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 根拠なし。幅を広く取って感度で見る
+  range:
+    low: 0.1
+    base: 0.25
+    high: 0.5
+  how_to_verify: コース予約の組数と人数を 1 か月分集計する
+  value: 0.25
+discount_application_rate:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 仮置き。通常価格と割引価格のどちらで予約されたかの比率
+  range:
+    low: 0.5
+    base: 0.8
+    high: 1.0
+  how_to_verify: 予約時のコース価格の内訳を確認する
+  value: 0.8
+cost_rate_ala:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 公庫 2025 年度 酒場・ビヤホールの原価率 32.2% の近辺。入力の根拠は仮置き
+  range:
+    low: 0.28
+    base: 0.32
+    high: 0.36
+  how_to_verify: 仕入額と売上の比率を 1 か月分集計する
+  value: 0.32
+cost_rate_course:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 公庫の原価率 32.2% の近辺。コースも同じ率と仮置き
+  range:
+    low: 0.28
+    base: 0.32
+    high: 0.36
+  how_to_verify: コースの仕入額を 1 か月分集計する
+  value: 0.32
+rent_monthly:
+  unit: yen/month
+  status: ASSUMPTION
+  justification: v5 の 960 万円/年 を月割りした 800,000 円を base にした仮置き。契約賃料は未観測
+  range:
+    low: 600000
+    base: 800000
+    high: 1000000
+  how_to_verify: 賃貸契約書で賃料を確認する
+  value: 800000
+other_expenses_monthly:
+  unit: yen/month
+  status: ASSUMPTION
+  justification: 光熱費・カード手数料・消耗品・広告・保険・通信・会計の仮置き
+  range:
+    low:
+      utilities: 96000
+      card_fee: 48000
+      supplies: 40000
+      advertising: 32000
+      insurance: 16000
+      telecom: 16000
+      accounting: 24000
+    base: &id004
+      utilities: 120000
+      card_fee: 60000
+      supplies: 50000
+      advertising: 40000
+      insurance: 20000
+      telecom: 20000
+      accounting: 30000
+    high:
+      utilities: 144000
+      card_fee: 72000
+      supplies: 60000
+      advertising: 48000
+      insurance: 24000
+      telecom: 24000
+      accounting: 36000
+  how_to_verify: 直近 3 か月の請求書で費目別に確認する
+  value: *id004
+owner_hours_monthly:
+  unit: hours/month
+  status: ASSUMPTION
+  justification: 仮置き。店主が店に立つ時間
+  range:
+    low: 200
+    base: 240
+    high: 280
+  how_to_verify: 1 週間の稼働時間を記録する
+  value: 240
+owner_virtual_wage:
+  unit: yen/hour
+  status: ASSUMPTION
+  justification: 仮置き。店主の労働を時給に換算する単価
+  range:
+    low: 1500
+    base: 2000
+    high: 2500
+  how_to_verify: 同等の職務の求人時給を確認する
+  value: 2000
+full_time_staff:
+  unit: staff
+  status: ASSUMPTION
+  justification: バードマンの正社員数は公開情報に無い。1 人と仮置き
+  range:
+    low:
+    - role: 店長
+      count: 1
+      monthly_salary: 280000
+    base: &id005
+    - role: 店長
+      count: 1
+      monthly_salary: 300000
+    high:
+    - role: 店長
+      count: 2
+      monthly_salary: 320000
+  how_to_verify: 在籍人数と給与を店に確認する
+  value: *id005
+part_time_staff:
+  unit: staff
+  status: ASSUMPTION
+  justification: アルバイトの人数・時間は公開情報に無い。ランチと夜の延べ人数の仮置き
+  range:
+    low:
+      heads_per_day: 1
+      hours_per_day: 4
+      hourly_wage: 1280
+    base: &id006
+      heads_per_day: 2
+      hours_per_day: 5
+      hourly_wage: 1330
+    high:
+      heads_per_day: 3
+      hours_per_day: 6
+      hourly_wage: 1400
+  how_to_verify: シフト表で延べ人数と時間を確認する
+  value: *id006
+independence_cost_monthly:
+  unit: yen/month
+  status: ASSUMPTION
+  justification: 本部機能（経理・採用・予約システム）を自前でまかなう費用の仮置き（spec 1.2）
+  range:
+    low: 50000
+    base: 80000
+    high: 120000
+  how_to_verify: 外注見積もりを取る
+  value: 80000
+depreciation_monthly:
+  unit: yen/month
+  status: ASSUMPTION
+  justification: 設備投資の仮置き。年数で割った月額
+  range:
+    low: 0
+    base: 50000
+    high: 100000
+  how_to_verify: 設備の取得価額と耐用年数を確認する
+  value: 50000
+loan_principal_monthly:
+  unit: yen/month
+  status: ASSUMPTION
+  justification: 借入の仮置き。元本返済は CF だけに効く
+  range:
+    low: 0
+    base: 100000
+    high: 150000
+  how_to_verify: 借入契約の返済予定表を確認する
+  value: 100000
+loan_interest_monthly:
+  unit: yen/month
+  status: ASSUMPTION
+  justification: 借入利息の仮置き
+  range:
+    low: 0
+    base: 10000
+    high: 20000
+  how_to_verify: 借入契約の利率を確認する
+  value: 10000
+capex_monthly:
+  unit: yen/month
+  status: ASSUMPTION
+  justification: 設備投資の仮置き。既定は 0
+  range:
+    low: 0
+    base: 0
+    high: 50000
+  how_to_verify: 設備投資の予定を確認する
+  value: 0

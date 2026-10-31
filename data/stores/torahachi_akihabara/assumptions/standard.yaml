@@ -1,0 +1,328 @@
+lunch_avg_ticket:
+  unit: yen
+  status: ASSUMPTION
+  justification: とら八は 16:00 開店で昼営業なし。0 で固定
+  range:
+    low: 0
+    base: 0
+    high: 0
+  value: 0
+lunch_arrival_groups:
+  unit: groups
+  status: ASSUMPTION
+  justification: 昼営業なしのため 0
+  range:
+    low: 0
+    base: 0
+    high: 0
+  value: 0
+group_size_distribution:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 夜のグループ人数の仮置き
+  range:
+    low:
+      1: 0.3
+      2: 0.45
+      3: 0.15
+      4: 0.1
+    base: &id001
+      1: 0.25
+      2: 0.45
+      3: 0.2
+      4: 0.1
+    high:
+      1: 0.2
+      2: 0.45
+      3: 0.25
+      4: 0.1
+  value: *id001
+lunch_stay_minutes:
+  unit: minutes
+  status: ASSUMPTION
+  justification: 昼営業なしのため未使用
+  range:
+    low: 30
+    base: 40
+    high: 55
+  value: 40
+cleanup_minutes:
+  unit: minutes
+  status: ASSUMPTION
+  justification: spec 6.4 の仮定 5 分
+  range:
+    low: 3
+    base: 5
+    high: 10
+  value: 5
+max_wait_minutes:
+  unit: minutes
+  status: ASSUMPTION
+  justification: 仮置き
+  range:
+    low: 5
+    base: 10
+    high: 20
+  value: 10
+dinner_demand_by_weekday:
+  unit: people/day
+  status: ASSUMPTION
+  justification: とら八の夜の需要は公開情報に無い。席数 150 と立地から置いた仮置き
+  range:
+    low:
+      mon: 49
+      tue: 52
+      wed: 56
+      thu: 59
+      fri: 70
+      sat: 77
+      sun: 42
+    base: &id002
+      mon: 70
+      tue: 75
+      wed: 80
+      thu: 85
+      fri: 100
+      sat: 110
+      sun: 60
+    high:
+      mon: 91
+      tue: 98
+      wed: 104
+      thu: 110
+      fri: 130
+      sat: 143
+      sun: 78
+  how_to_verify: 曜日別の入店客数を POS で 1 か月分集計する
+  value: *id002
+dinner_seasonality:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 12 月が最も高く 2 月が最も低いという調査（S18）を参考にした仮置き
+  range:
+    low:
+    - 0.9025
+    - 0.855
+    - 0.9215
+    - 0.95
+    - 0.969
+    - 0.95
+    - 0.9785
+    - 0.95
+    - 0.95
+    - 0.95
+    - 0.9975
+    - 1.0925
+    base: &id003
+    - 0.95
+    - 0.9
+    - 0.97
+    - 1.0
+    - 1.02
+    - 1.0
+    - 1.03
+    - 1.0
+    - 1.0
+    - 1.0
+    - 1.05
+    - 1.15
+    high:
+    - 0.9975
+    - 0.945
+    - 1.0185
+    - 1.05
+    - 1.071
+    - 1.05
+    - 1.0815
+    - 1.05
+    - 1.05
+    - 1.05
+    - 1.1025
+    - 1.2075
+  value: *id003
+dinner_ala_ticket:
+  unit: yen
+  status: ASSUMPTION
+  justification: 食べログの夜予算の範囲で置いた仮置き
+  range:
+    low: 4000
+    base: 4500
+    high: 5000
+  how_to_verify: 夜の客単価を POS で集計する
+  value: 4500
+course_ratio:
+  unit: ratio
+  status: ASSUMPTION
+  justification: コース 3 種があるため高めに置いた仮置き
+  range:
+    low: 0.2
+    base: 0.35
+    high: 0.5
+  how_to_verify: コース予約の人数を 1 か月分集計する
+  value: 0.35
+discount_application_rate:
+  unit: ratio
+  status: ASSUMPTION
+  justification: とら八のコースは通常価格のみで割引が無いため 1.0
+  range:
+    low: 1.0
+    base: 1.0
+    high: 1.0
+  value: 1.0
+cost_rate_ala:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 公庫の原価率 32.2% の近辺の仮置き
+  range:
+    low: 0.28
+    base: 0.32
+    high: 0.36
+  value: 0.32
+cost_rate_course:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 公庫の原価率 32.2% の近辺の仮置き
+  range:
+    low: 0.28
+    base: 0.32
+    high: 0.36
+  value: 0.32
+rent_monthly:
+  unit: yen/month
+  status: ASSUMPTION
+  justification: 秋葉原の 150 席・3 フロアの賃料は未観測。仮置き
+  range:
+    low: 900000
+    base: 1200000
+    high: 1500000
+  how_to_verify: 賃貸契約書で賃料を確認する
+  value: 1200000
+other_expenses_monthly:
+  unit: yen/month
+  status: ASSUMPTION
+  justification: 150 席・3 フロアに合わせてバードマンの 2 倍で置いた仮置き
+  range:
+    low:
+      utilities: 180000
+      card_fee: 90000
+      supplies: 75000
+      advertising: 60000
+      insurance: 30000
+      telecom: 30000
+      accounting: 45000
+    base: &id004
+      utilities: 240000
+      card_fee: 120000
+      supplies: 100000
+      advertising: 80000
+      insurance: 40000
+      telecom: 40000
+      accounting: 60000
+    high:
+      utilities: 300000
+      card_fee: 150000
+      supplies: 125000
+      advertising: 100000
+      insurance: 50000
+      telecom: 50000
+      accounting: 75000
+  value: *id004
+owner_hours_monthly:
+  unit: hours/month
+  status: ASSUMPTION
+  justification: 仮置き
+  range:
+    low: 200
+    base: 240
+    high: 280
+  value: 240
+owner_virtual_wage:
+  unit: yen/hour
+  status: ASSUMPTION
+  justification: 仮置き
+  range:
+    low: 1500
+    base: 2000
+    high: 2500
+  value: 2000
+full_time_staff:
+  unit: staff
+  status: ASSUMPTION
+  justification: spec 2.2 の標準シナリオ（正社員 5 人・月給 35 万円）
+  range:
+    low:
+    - role: 正社員
+      count: 5
+      monthly_salary: 330000
+    base: &id005
+    - role: 正社員
+      count: 5
+      monthly_salary: 350000
+    high:
+    - role: 正社員
+      count: 6
+      monthly_salary: 370000
+  value: *id005
+part_time_staff:
+  unit: staff
+  status: ASSUMPTION
+  justification: spec 2.2 の標準シナリオ（延べ 8 人/日・5 時間・時給 1,330 円）。在籍人数ではない
+  range:
+    low:
+      heads_per_day: 6
+      hours_per_day: 4
+      hourly_wage: 1330
+    base: &id006
+      heads_per_day: 8
+      hours_per_day: 5
+      hourly_wage: 1330
+    high:
+      heads_per_day: 10
+      hours_per_day: 6
+      hourly_wage: 1400
+  value: *id006
+independence_cost_monthly:
+  unit: yen/month
+  status: ASSUMPTION
+  justification: 本部機能の仮置き
+  range:
+    low: 50000
+    base: 80000
+    high: 120000
+  value: 80000
+depreciation_monthly:
+  unit: yen/month
+  status: ASSUMPTION
+  justification: 設備投資の仮置き
+  range:
+    low: 0
+    base: 50000
+    high: 100000
+  value: 50000
+loan_principal_monthly:
+  unit: yen/month
+  status: ASSUMPTION
+  justification: 借入の仮置き
+  range:
+    low: 0
+    base: 100000
+    high: 150000
+  value: 100000
+loan_interest_monthly:
+  unit: yen/month
+  status: ASSUMPTION
+  justification: 借入利息の仮置き
+  range:
+    low: 0
+    base: 10000
+    high: 20000
+  value: 10000
+capex_monthly:
+  unit: yen/month
+  status: ASSUMPTION
+  justification: 設備投資の仮置き
+  range:
+    low: 0
+    base: 0
+    high: 50000
+  value: 0

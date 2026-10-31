@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}座席・卓 - {{ store_id }}{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold text-gray-800 mb-4">座席・卓</h1>
+
+<div class="grid gap-6 md:grid-cols-2">
+    {% for floor in floor_rows %}
+    <section class="bg-white rounded-lg shadow p-4">
+        <div class="flex items-center justify-between mb-2">
+            <h2 class="font-bold text-gray-800">{{ floor.id }}</h2>
+            <span class="text-xs text-gray-500">{{ floor.status }}</span>
+        </div>
+        <p class="text-xs text-gray-500 mb-2">開放: {{ floor.policy }}</p>
+        {% if floor.tables %}
+        <p class="text-sm mb-2">{{ floor.tables | length }} 卓 / {{ floor.tables | sum(attribute='seats') }} 席</p>
+        <ul class="grid grid-cols-3 gap-2 text-xs">
+            {% for table in floor.tables %}
+            <li class="border rounded px-2 py-1">{{ table.id }}: {{ table.seats }} 席</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        {% if floor.candidates %}
+        <p class="text-sm font-medium mt-3 mb-1">候補（UNRESOLVED）</p>
+        <ul class="text-xs space-y-2">
+            {% for name, tables in floor.candidates.items() %}
+            <li>
+                <span class="font-medium">{{ name }}</span>:
+                {{ tables | length }} 卓 / {{ tables | sum(attribute='seats') }} 席
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        {% if floor.note %}<p class="text-xs text-gray-500 mt-2">{{ floor.note }}</p>{% endif %}
+    </section>
+    {% endfor %}
+</div>
+
+<section class="bg-white rounded-lg shadow p-4 mt-6">
+    <h2 class="font-bold text-gray-800 mb-2">有効着席人数（シミュレーション結果）</h2>
+    <p class="text-sm text-gray-600">
+        使った卓: {{ result.simulation.tables | length }} 卓 /
+        {{ result.simulation.tables | sum(attribute='seats') }} 席。
+        昼の入店客数は曜日別に
+        {% for weekday, guests in result.simulation.lunch_guests_by_weekday.items() %}{{ weekday }} {{ guests }} 人{% if not loop.last %}、{% endif %}{% endfor %}。
+    </p>
+    <p class="text-xs text-gray-500 mt-2">物理席数は客数の上限ではない。卓のミスマッチ・待ち・離脱をシミュレーションで扱う。</p>
+</section>
+{% endblock %}

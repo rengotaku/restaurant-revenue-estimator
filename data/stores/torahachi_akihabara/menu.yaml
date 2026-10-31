@@ -1,0 +1,97 @@
+menu_items:
+  dinner:
+    value:
+      - {name: とら八名物 焼き鳥盛り合わせ, price: 1200}
+      - {name: 刺身盛り合わせ, price: 1500}
+    unit: yen
+    status: PUBLIC_REPORTED
+    sources: [S05]
+    note: "品書きの一部。単品価格の全体は未確認"
+
+courses:
+  standard:
+    name: とら八定番
+    normal_price:
+      value: 4500
+      unit: yen
+      status: PUBLIC_VERIFIED
+      sources: [S06]
+    discounted_price:
+      value: 4500
+      unit: yen
+      status: PUBLIC_VERIFIED
+      sources: [S06]
+    min_guests: 2
+    max_guests: 54
+    duration_minutes:
+      value: 150
+      unit: minutes
+      status: PUBLIC_VERIFIED
+      sources: [S06]
+    includes_drink:
+      value: true
+      unit: bool
+      status: PUBLIC_VERIFIED
+      sources: [S06]
+
+  full:
+    name: とら八満喫
+    normal_price:
+      value: 5000
+      unit: yen
+      status: PUBLIC_VERIFIED
+      sources: [S06]
+    discounted_price:
+      value: 5000
+      unit: yen
+      status: PUBLIC_VERIFIED
+      sources: [S06]
+    min_guests: 2
+    max_guests: 54
+    duration_minutes:
+      value: 150
+      unit: minutes
+      status: PUBLIC_VERIFIED
+      sources: [S06]
+    includes_drink:
+      value: true
+      unit: bool
+      status: PUBLIC_VERIFIED
+      sources: [S06]
+
+  light:
+    name: お気軽
+    normal_price:
+      value: 4000
+      unit: yen
+      status: PUBLIC_VERIFIED
+      sources: [S06]
+    discounted_price:
+      value: 4000
+      unit: yen
+      status: PUBLIC_VERIFIED
+      sources: [S06]
+    min_guests: 2
+    max_guests: 54
+    duration_minutes:
+      value: 120
+      unit: minutes
+      status: PUBLIC_VERIFIED
+      sources: [S06]
+    includes_drink:
+      value: true
+      unit: bool
+      status: PUBLIC_VERIFIED
+      sources: [S06]
+
+appetizer:
+  price:
+    value: 0
+    unit: yen
+    status: PUBLIC_VERIFIED
+    sources: [S05]
+  waived_for_course:
+    value: true
+    unit: bool
+    status: PUBLIC_VERIFIED
+    sources: [S05]

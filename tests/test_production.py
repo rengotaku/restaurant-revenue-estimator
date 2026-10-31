@@ -95,9 +95,7 @@ class TestMakefileBuildTarget:
             timeout=60,
             check=False,
         )
-        assert result.returncode == 0, (
-            f"make build failed: {result.stderr}"
-        )
+        assert result.returncode == 0, f"make build failed: {result.stderr}"
         assert css_output.exists()
 
     def test_minified_css_is_smaller_than_dev_css(self) -> None:
@@ -114,9 +112,12 @@ class TestMakefileBuildTarget:
 
         # dev build (no minify)
         _tailwind_cmd = [
-            "npx", "@tailwindcss/cli",
-            "-i", "static/css/input.css",
-            "-o", "static/css/style.css",
+            "npx",
+            "@tailwindcss/cli",
+            "-i",
+            "static/css/input.css",
+            "-o",
+            "static/css/style.css",
         ]
         subprocess.run(
             _tailwind_cmd,
@@ -142,8 +143,7 @@ class TestMakefileBuildTarget:
         assert prod_size > 0
 
         assert prod_size < dev_size, (
-            f"minify 後のサイズが開発ビルド以上: "
-            f"dev={dev_size}B, prod={prod_size}B"
+            f"minify 後のサイズが開発ビルド以上: dev={dev_size}B, prod={prod_size}B"
         )
 
     def test_build_input_css_exists(self) -> None:
@@ -172,8 +172,7 @@ class TestMakefileRunTarget:
         content = _read_makefile()
         run_section = _extract_target_section(content, "run")
         assert re.search(r"--reload(\s|$)", run_section), (
-            "run target で --reload が見つからない。"
-            f"section: {run_section}"
+            f"run target で --reload が見つからない。section: {run_section}"
         )
 
     def test_run_target_uses_uvicorn(self) -> None:
@@ -189,19 +188,19 @@ class TestMakefileRunTarget:
         run_section = _extract_target_section(content, "run")
         assert "PORT" in run_section
 
-    def test_run_target_binds_to_all_interfaces(self) -> None:
-        """run ターゲットが 0.0.0.0 にバインドすること."""
+    def test_run_target_binds_to_loopback(self) -> None:
+        """run ターゲットが 127.0.0.1 にバインドすること (ADR 0002)."""
         content = _read_makefile()
         run_section = _extract_target_section(content, "run")
-        assert "0.0.0.0" in run_section
+        assert "127.0.0.1" in run_section
+        assert "0.0.0.0" not in run_section
 
     def test_run_target_runs_tailwind_watch(self) -> None:
         """run ターゲットが Tailwind --watch を起動すること."""
         content = _read_makefile()
         run_section = _extract_target_section(content, "run")
         assert "--watch" in run_section, (
-            "run target で Tailwind --watch が見つからない。"
-            f"section: {run_section}"
+            f"run target で Tailwind --watch が見つからない。section: {run_section}"
         )
 
 
