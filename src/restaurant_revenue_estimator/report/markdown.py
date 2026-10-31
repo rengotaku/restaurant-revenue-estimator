@@ -49,7 +49,10 @@ def result_to_dict(result: EvaluationResult) -> dict[str, Any]:
         "simulation": {
             "lunch_guests_by_weekday": result.lunch_guests_by_weekday,
             "lost_lunch_guests": result.lost_lunch_guests,
+            "dinner_desired_guests": result.dinner_desired_guests,
             "dinner_guests": result.dinner_guests,
+            "dinner_lost_guests": result.dinner_lost_guests,
+            "dinner_lost_by_reason": result.dinner_lost_by_reason,
             "tables": [
                 {"id": table.id, "seats": table.seats, "floor": table.floor}
                 for table in result.tables
@@ -202,7 +205,18 @@ def render_markdown(  # noqa: PLR0915
     )
     lines.append(f"- 昼の入店客数（曜日別の代表日）: {lunch_text or '—'}")
     lines.append(f"- 昼の失った需要: {result.lost_lunch_guests:.1f} 人/日")
+    lines.append(f"- 夜の来店希望人数: {result.dinner_desired_guests:,} 人/年")
     lines.append(f"- 夜の入店客数: {result.dinner_guests:,} 人/年")
+    if result.dinner_lost_by_reason:
+        reasons_text = ", ".join(
+            f"{reason} {count:,} 人"
+            for reason, count in sorted(result.dinner_lost_by_reason.items())
+        )
+        lines.append(
+            f"- 夜の失った需要: {result.dinner_lost_guests:,} 人/年（{reasons_text}）"
+        )
+    else:
+        lines.append(f"- 夜の失った需要: {result.dinner_lost_guests:,} 人/年")
     lines.append(f"- 2 階の候補: {result.variant}")
     lines.append("")
 

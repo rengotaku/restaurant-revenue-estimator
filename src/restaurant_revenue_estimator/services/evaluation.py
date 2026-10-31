@@ -1,7 +1,11 @@
 """評価の実行: カレンダー → 昼 → 夜 → 売上 → 費用 → 損益."""
 
 import hashlib
-from dataclasses import dataclass
+import math
+import re
+from collections.abc import Sequence
+from dataclasses import dataclass, field
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, cast
@@ -9,6 +13,7 @@ from typing import Any, cast
 from restaurant_revenue_estimator import __version__
 from restaurant_revenue_estimator.engine.calendar import (
     CalendarSeries,
+    DaySchedule,
     ServiceHours,
     calendars_for_store,
     load_holidays,
@@ -23,13 +28,18 @@ from restaurant_revenue_estimator.engine.cost import (
     statutory_cost,
     variable_costs,
 )
-from restaurant_revenue_estimator.engine.dinner import CourseSpec, plan_dinner
+from restaurant_revenue_estimator.engine.dinner import (
+    CourseSpec,
+    can_extend,
+    simulate_dinner_day,
+)
 from restaurant_revenue_estimator.engine.lunch import simulate_lunch_day
 from restaurant_revenue_estimator.engine.pnl import PnL, build_pnl
 from restaurant_revenue_estimator.engine.revenue import (
     CourseSales,
     DaySales,
     RevenueResult,
+    SeasonalityRegistry,
     ServiceSales,
     aggregate,
     realized_course_price,
@@ -93,6 +103,10 @@ class EvaluationResult:
     tables: tuple[Table, ...]
     meta: EvaluationMeta
     unresolved: tuple[str, ...] = ()
+    dinner_desired_guests: int = 0
+    dinner_lost_guests: int = 0
+    dinner_lost_by_reason: dict[str, int] = field(default_factory=dict)
+    seasonality_targets: dict[str, str] = field(default_factory=dict)
 
     @property
     def gross_inc_tax(self) -> int:
@@ -342,7 +356,247 @@ def evaluate(
     return results
 
 
-def _evaluate_variant(  # noqa: PLR0915
+def _validate_dinner_assumptions(
+    values: dict[str, Any], dinner_days: Sequence[DaySchedule]
+) -> None:
+    stay = values.get("dinner_stay_minutes")
+    if not isinstance(stay, (int, float)) or not math.isfinite(stay) or stay <= 0:
+        raise EvaluationError("dinner_stay_minutes は正の数値")
+
+    for key in ("dinner_peak_share", "course_extension_rate"):
+        rate = values.get(key)
+        if (
+            not isinstance(rate, (int, float))
+            or not math.isfinite(rate)
+            or not (0.0 <= rate <= 1.0)
+        ):
+            raise EvaluationError(f"{key} は有限で 0〜1")
+
+    csw = values.get("course_start_window")
+    if not isinstance(csw, dict) or "start" not in csw or "end" not in csw:
+        raise EvaluationError("course_start_window は start と end を持つ dict")
+    start_str = str(csw["start"])
+    end_str = str(csw["end"])
+
+    time_pattern = r"^([01]\d|2[0-3]):[0-5]\d$"
+    if not re.match(time_pattern, start_str) or not re.match(
+        time_pattern, end_str
+    ):
+        raise EvaluationError("course_start_window は HH:MM 形式")
+
+    if start_str > end_str:
+        raise EvaluationError("course_start_window は start <= end")
+
+    for day in dinner_days:
+        if day.dinner is not None and (
+            start_str < day.dinner.open or end_str > day.dinner.last_entry
+        ):
+            raise EvaluationError(
+                f"course_start_window ({start_str}〜{end_str}) が営業範囲 "
+                f"({day.dinner.open}〜{day.dinner.last_entry}) 外"
+            )
+
+
+DinnerComboKey = tuple[str, int, bool, str, str, str]
+
+
+def group_dinner_days(
+    days: Sequence[DaySchedule], holidays: set[date] | dict[date, Any]
+) -> dict[DinnerComboKey, list[DaySchedule]]:
+    """夜の営業日を（曜日, 月, 延長可否, 営業時間）の組合せごとにグループ化する."""
+    h_set = set(holidays.keys()) if isinstance(holidays, dict) else holidays
+    combos: dict[DinnerComboKey, list[DaySchedule]] = {}
+    for day in days:
+        if day.dinner is None:
+            continue
+        can_ext = can_extend(day.day, h_set)
+        key: DinnerComboKey = (
+            day.weekday,
+            day.day.month,
+            can_ext,
+            day.dinner.open,
+            day.dinner.last_entry,
+            day.dinner.close,
+        )
+        combos.setdefault(key, []).append(day)
+    return combos
+
+
+def _evaluate_dinner(  # noqa: PLR0915
+    *,
+    calendar: CalendarSeries,
+    tables: Sequence[Table],
+    floors: Sequence[Floor],
+    course_specs: dict[str, CourseSpec],
+    dinner_ala_ticket: int,
+    appetizer_price: int,
+    appetizer_waived: bool,
+    values: dict[str, Any],
+    holidays: set[date],
+    request: EvaluationRequest,
+) -> tuple[
+    dict[date, ServiceSales],
+    int,
+    int,
+    int,
+    dict[str, int],
+    dict[str, str],
+]:
+    dinner_days = [day for day in calendar.open_days if day.dinner is not None]
+    if not dinner_days:
+        return {}, 0, 0, 0, {}, {}
+
+    _validate_dinner_assumptions(values, dinner_days)
+
+    registry = SeasonalityRegistry()
+    seasons = [float(v) for v in values["dinner_seasonality"]]
+    demand_by_weekday = values["dinner_demand_by_weekday"]
+    base_course_ratio = float(values["course_ratio"])
+
+    combos = group_dinner_days(dinner_days, holidays)
+
+    month_effects = [
+        float(v) for v in values.get("course_ratio_month_effect", [0.0] * 12)
+    ]
+    weekday_effects = {
+        k: float(v)
+        for k, v in values.get(
+            "course_ratio_weekday_effect", dict.fromkeys(WEEKDAYS, 0.0)
+        ).items()
+    }
+
+    combo_results: dict[DinnerComboKey, Any] = {}
+    sorted_combos = sorted(combos.keys())
+
+    for combo_idx, combo_key in enumerate(sorted_combos):
+        weekday, month, can_ext, d_open, d_last_entry, d_close = combo_key
+        sample_day = combos[combo_key][0]
+        assert sample_day.dinner is not None
+
+        # 1. 来店希望人数 D
+        season_factor = float(
+            registry.apply(
+                "dinner_seasonality", Decimal(str(seasons[month - 1])), "guests"
+            )
+        )
+        base_demand = float(demand_by_weekday.get(weekday, 0))
+        d_guests = max(0, round(base_demand * season_factor))
+
+        # 2. コース比率 r
+        b_month = month_effects[month - 1]
+        b_weekday = weekday_effects.get(weekday, 0.0)
+        if base_course_ratio in (0.0, 1.0):
+            r_course = base_course_ratio
+        else:
+            logit = (
+                math.log(base_course_ratio / (1.0 - base_course_ratio))
+                + b_month
+                + b_weekday
+            )
+            r_course = 1.0 / (1.0 + math.exp(-logit))
+
+        open_clock = d_open
+        open_h, open_m = map(int, d_open.split(":"))
+        close_h, close_m = map(int, d_close.split(":"))
+        last_h, last_m = map(int, d_last_entry.split(":"))
+        open_total = open_h * 60 + open_m
+        close_min = (close_h * 60 + close_m) - open_total
+        last_entry_min = (last_h * 60 + last_m) - open_total
+
+        combo_seed = request.seed + combo_idx * 1000
+
+        res = simulate_dinner_day(
+            tables=tables,
+            floors=floors,
+            desired_guests=d_guests,
+            course_ratio=r_course,
+            courses=course_specs,
+            dinner_stay_minutes=int(values["dinner_stay_minutes"]),
+            dinner_peak_share=float(values["dinner_peak_share"]),
+            dinner_group_size_distribution={
+                int(k): float(v)
+                for k, v in values["dinner_group_size_distribution"].items()
+            },
+            course_party_size_distribution={
+                int(k): float(v)
+                for k, v in values["course_party_size_distribution"].items()
+            },
+            course_start_window=values["course_start_window"],
+            course_extension_rate=float(values["course_extension_rate"]),
+            can_extend_today=can_ext,
+            cleanup_minutes=int(values["cleanup_minutes"]),
+            max_wait_minutes=int(values["max_wait_minutes"]),
+            open_minute=0,
+            last_entry_minute=last_entry_min,
+            close_minute=close_min,
+            open_clock=open_clock,
+            replications=max(1, request.replications),
+            seed=combo_seed,
+        )
+        combo_results[combo_key] = res
+
+    dinner_sales_by_date: dict[date, ServiceSales] = {}
+    dinner_guests = 0
+    total_dinner_desired = 0
+    total_dinner_lost = 0.0
+    dinner_lost_by_reason_accum: dict[str, float] = {}
+
+    for day in dinner_days:
+        assert day.dinner is not None
+        can_ext = can_extend(day.day, holidays)
+        combo_key = (
+            day.weekday,
+            day.day.month,
+            can_ext,
+            day.dinner.open,
+            day.dinner.last_entry,
+            day.dinner.close,
+        )
+        res = combo_results[combo_key]
+
+        total_dinner_desired += round(res.walk_in_desired + res.course_desired)
+        total_dinner_lost += res.lost_guests
+        for reason, count in res.lost_by_reason.items():
+            dinner_lost_by_reason_accum[reason] = (
+                dinner_lost_by_reason_accum.get(reason, 0.0) + count
+            )
+
+        ala_guests_int = round(res.walk_in_entered)
+        course_guests_int = {
+            c_id: round(res.course_entered_by_course.get(c_id, 0.0))
+            for c_id in course_specs
+        }
+        total_day_dinner = ala_guests_int + sum(course_guests_int.values())
+        dinner_guests += total_day_dinner
+
+        dinner_sales_by_date[day.day] = ServiceSales(
+            ala_guests=ala_guests_int,
+            ala_ticket=dinner_ala_ticket,
+            courses=tuple(
+                CourseSales(guests=count, unit_price=course_specs[course_id].price)
+                for course_id, count in course_guests_int.items()
+                if count > 0
+            ),
+            appetizer_yen=appetizer_price,
+            appetizer_waived_for_course=appetizer_waived,
+        )
+
+    dinner_lost_by_reason = {
+        reason: round(count) for reason, count in dinner_lost_by_reason_accum.items()
+    }
+    seasonality_targets = dict(registry._targets)
+
+    return (
+        dinner_sales_by_date,
+        dinner_guests,
+        total_dinner_desired,
+        round(total_dinner_lost),
+        dinner_lost_by_reason,
+        seasonality_targets,
+    )
+
+
+def _evaluate_variant(
     *,
     inputs: StoreInputs,
     request: EvaluationRequest,
@@ -389,42 +643,41 @@ def _evaluate_variant(  # noqa: PLR0915
             lunch_guests_by_weekday[weekday] = round(lunch.guests)
             lost_lunch += lunch.lost
 
-    seasons = [float(value) for value in values["dinner_seasonality"]]
-    demand_by_weekday = values["dinner_demand_by_weekday"]
-    dinner_ala_ticket = values["dinner_ala_ticket"]
-    base_course_ratio = float(values["course_ratio"])
-    lunch_ticket = values["lunch_avg_ticket"]
+    holidays = set(
+        load_holidays(
+            data_dir / "calendars" / "jp_holidays_cao.csv",
+            data_dir / "calendars" / "jp_holidays_cao.meta.yaml",
+            request.year,
+        ).keys()
+    )
+    (
+        dinner_sales_by_date,
+        dinner_guests,
+        dinner_desired_guests,
+        dinner_lost_guests,
+        dinner_lost_by_reason,
+        seasonality_targets,
+    ) = _evaluate_dinner(
+        calendar=calendar,
+        tables=tables,
+        floors=floors,
+        course_specs=course_specs,
+        dinner_ala_ticket=int(values["dinner_ala_ticket"]),
+        appetizer_price=appetizer_price,
+        appetizer_waived=appetizer_waived,
+        values=values,
+        holidays=holidays,
+        request=request,
+    )
 
+    lunch_ticket = values["lunch_avg_ticket"]
     days: list[DaySales] = []
-    dinner_guests = 0
     for day in calendar.open_days:
         lunch_sales = ServiceSales()
         if day.lunch is not None:
             guests = lunch_guests_by_weekday.get(day.weekday, 0)
             lunch_sales = ServiceSales(ala_guests=guests, ala_ticket=lunch_ticket)
-        dinner_sales = ServiceSales()
-        if day.dinner is not None:
-            base = float(demand_by_weekday.get(day.weekday, 0))
-            guests = max(0, round(base * seasons[day.day.month - 1]))
-            plan = plan_dinner(
-                day=day.day,
-                guests=guests,
-                courses=course_specs,
-                tables=tables,
-                base_ratio=base_course_ratio,
-                start_minute=0,
-            )
-            dinner_guests += plan.total_guests
-            dinner_sales = ServiceSales(
-                ala_guests=plan.ala_guests,
-                ala_ticket=dinner_ala_ticket,
-                courses=tuple(
-                    CourseSales(guests=count, unit_price=course_specs[course_id].price)
-                    for course_id, count in plan.course_guests.items()
-                ),
-                appetizer_yen=appetizer_price,
-                appetizer_waived_for_course=appetizer_waived,
-            )
+        dinner_sales = dinner_sales_by_date.get(day.day, ServiceSales())
         days.append(DaySales(day=day.day, lunch=lunch_sales, dinner=dinner_sales))
 
     revenue = aggregate(days)
@@ -510,4 +763,8 @@ def _evaluate_variant(  # noqa: PLR0915
         tables=tuple(tables),
         meta=meta,
         unresolved=unresolved,
+        dinner_desired_guests=dinner_desired_guests,
+        dinner_lost_guests=dinner_lost_guests,
+        dinner_lost_by_reason=dinner_lost_by_reason,
+        seasonality_targets=seasonality_targets,
     )
