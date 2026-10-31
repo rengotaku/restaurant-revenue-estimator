@@ -142,7 +142,10 @@ def simulate(  # noqa: PLR0912, PLR0915
         floor_id: [] for floor_id in floor_order
     }
     seating_events: list[tuple[int, int, str]] = []
-    active: list[tuple[int, int, str]] = []
+    current_queue_people = 0
+    current_occupied_people = 0
+    current_occupied_tables: dict[str, int] = dict.fromkeys(floor_order, 0)
+    departures: dict[int, list[tuple[int, str]]] = {}
     next_arrival = 0
     seatings_in_window = 0
     max_seats = max((table.seats for table in tables), default=0)
@@ -213,16 +216,19 @@ def simulate(  # noqa: PLR0912, PLR0915
                 queue.append(
                     _Waiting(arrival.minute, arrival.size, arrival.stay_minutes)
                 )
+                current_queue_people += arrival.size
 
         if minute >= config.last_entry_minute:
             for group in queue:
                 lose(group, "last_entry")
             queue.clear()
+            current_queue_people = 0
 
         remaining: list[_Waiting] = []
         for group in queue:
             if minute - group.arrival > config.max_wait_minutes:
                 lose(group, "wait_timeout")
+                current_queue_people -= group.size
             else:
                 remaining.append(group)
         queue = remaining
@@ -244,20 +250,30 @@ def simulate(  # noqa: PLR0912, PLR0915
                 entered_groups += 1
                 entered_by_floor[table.floor] += group.size
                 seat_minutes += group.size * group.stay
-                active.append((minute + group.stay, group.size, table.floor))
                 seating_events.append((minute, group.size, table.floor))
                 seatings_in_window += 1
                 queue.pop(index)
+                current_queue_people -= group.size
+                current_occupied_people += group.size
+                current_occupied_tables[table.floor] += 1
+                leave_minute = minute + group.stay
+                departures.setdefault(leave_minute, []).append(
+                    (group.size, table.floor)
+                )
                 seated_any = True
                 break
 
-        active = [item for item in active if item[0] > minute]
-        occupied_series.append(sum(size for _, size, _ in active))
+        if minute in departures:
+            for size, floor_id in departures.pop(minute):
+                current_occupied_people -= size
+                current_occupied_tables[floor_id] -= 1
+
+        occupied_series.append(current_occupied_people)
         for floor_id in floor_order:
             occupied_tables_series[floor_id].append(
-                sum(1 for _, _, floor in active if floor == floor_id)
+                current_occupied_tables[floor_id]
             )
-        queue_people_series.append(sum(group.size for group in queue))
+        queue_people_series.append(current_queue_people)
         queue_groups_series.append(len(queue))
 
     for group in queue:
