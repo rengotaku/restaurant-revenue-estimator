@@ -45,7 +45,7 @@ lunch_stay_minutes:
     low: 30
     base: 40
     high: 55
-  value: 55
+  value: 30
 cleanup_minutes:
   unit: minutes
   status: ASSUMPTION
@@ -54,7 +54,7 @@ cleanup_minutes:
     low: 3
     base: 5
     high: 10
-  value: 10
+  value: 3
 max_wait_minutes:
   unit: minutes
   status: ASSUMPTION
@@ -177,7 +177,7 @@ cost_rate_ala:
     low: 0.28
     base: 0.32
     high: 0.36
-  value: 0.36
+  value: 0.28
 cost_rate_course:
   unit: ratio
   status: ASSUMPTION
@@ -186,7 +186,7 @@ cost_rate_course:
     low: 0.28
     base: 0.32
     high: 0.36
-  value: 0.36
+  value: 0.28
 rent_monthly:
   unit: yen/month
   status: ASSUMPTION
@@ -196,7 +196,7 @@ rent_monthly:
     base: 1200000
     high: 1500000
   how_to_verify: 賃貸契約書で賃料を確認する
-  value: 1500000
+  value: 900000
 other_expenses_monthly:
   unit: yen/month
   status: ASSUMPTION
@@ -226,7 +226,14 @@ other_expenses_monthly:
       insurance: 50000
       telecom: 50000
       accounting: 75000
-  value: *id004
+  value:
+    utilities: 180000
+    card_fee: 90000
+    supplies: 75000
+    advertising: 60000
+    insurance: 30000
+    telecom: 30000
+    accounting: 45000
 owner_hours_monthly:
   unit: hours/month
   status: ASSUMPTION
@@ -262,7 +269,10 @@ full_time_staff:
     - role: 正社員
       count: 6
       monthly_salary: 370000
-  value: *id005
+  value:
+  - role: 正社員
+    count: 5
+    monthly_salary: 330000
 part_time_staff:
   unit: staff
   status: ASSUMPTION
@@ -280,7 +290,10 @@ part_time_staff:
       heads_per_day: 10
       hours_per_day: 6
       hourly_wage: 1400
-  value: *id006
+  value:
+    heads_per_day: 6
+    hours_per_day: 4
+    hourly_wage: 1330
 independence_cost_monthly:
   unit: yen/month
   status: ASSUMPTION
@@ -289,7 +302,7 @@ independence_cost_monthly:
     low: 50000
     base: 80000
     high: 120000
-  value: 120000
+  value: 50000
 depreciation_monthly:
   unit: yen/month
   status: ASSUMPTION
@@ -298,7 +311,7 @@ depreciation_monthly:
     low: 0
     base: 50000
     high: 100000
-  value: 100000
+  value: 0
 loan_principal_monthly:
   unit: yen/month
   status: ASSUMPTION
@@ -307,7 +320,7 @@ loan_principal_monthly:
     low: 0
     base: 100000
     high: 150000
-  value: 150000
+  value: 0
 loan_interest_monthly:
   unit: yen/month
   status: ASSUMPTION
@@ -316,7 +329,7 @@ loan_interest_monthly:
     low: 0
     base: 10000
     high: 20000
-  value: 20000
+  value: 0
 capex_monthly:
   unit: yen/month
   status: ASSUMPTION
@@ -325,4 +338,4 @@ capex_monthly:
     low: 0
     base: 0
     high: 50000
-  value: 50000
+  value: 0

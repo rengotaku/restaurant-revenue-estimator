@@ -60,4 +60,13 @@ year_end_closure:
   note: "年中無休・年末年始休みとだけ公開情報にある。日付は無い"
   how_to_verify: "店頭の掲示・電話で年末年始の休業日を確認する"
 
+recruiting_wages:
+  value:
+    full_time_monthly_from: 317000
+    part_time_hourly_from: 1330
+  unit: yen
+  status: PUBLIC_REPORTED
+  sources: [S07, S08]
+  note: "403 で本文を確認できなかった"
+
 related_stores: []

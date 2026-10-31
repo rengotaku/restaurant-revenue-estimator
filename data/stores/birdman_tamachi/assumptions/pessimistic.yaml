@@ -49,7 +49,7 @@ lunch_stay_minutes:
     base: 40
     high: 55
   how_to_verify: 着席から退店までの時間を 10 組分測る
-  value: 30
+  value: 55
 cleanup_minutes:
   unit: minutes
   status: ASSUMPTION
@@ -59,7 +59,7 @@ cleanup_minutes:
     base: 5
     high: 10
   how_to_verify: 退店から次の案内までの時間を測る
-  value: 3
+  value: 10
 max_wait_minutes:
   unit: minutes
   status: ASSUMPTION
@@ -176,7 +176,7 @@ discount_application_rate:
     base: 0.8
     high: 1.0
   how_to_verify: 予約時のコース価格の内訳を確認する
-  value: 0.5
+  value: 1.0
 cost_rate_ala:
   unit: ratio
   status: ASSUMPTION
@@ -285,7 +285,7 @@ full_time_staff:
   how_to_verify: 在籍人数と給与を店に確認する
   value:
   - role: 店長
-    count: 1
+    count: 2
     monthly_salary: 320000
 part_time_staff:
   unit: staff

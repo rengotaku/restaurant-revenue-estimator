@@ -49,7 +49,7 @@ lunch_stay_minutes:
     base: 40
     high: 55
   how_to_verify: 着席から退店までの時間を 10 組分測る
-  value: 55
+  value: 30
 cleanup_minutes:
   unit: minutes
   status: ASSUMPTION
@@ -59,7 +59,7 @@ cleanup_minutes:
     base: 5
     high: 10
   how_to_verify: 退店から次の案内までの時間を測る
-  value: 10
+  value: 3
 max_wait_minutes:
   unit: minutes
   status: ASSUMPTION
@@ -176,7 +176,7 @@ discount_application_rate:
     base: 0.8
     high: 1.0
   how_to_verify: 予約時のコース価格の内訳を確認する
-  value: 1.0
+  value: 0.5
 cost_rate_ala:
   unit: ratio
   status: ASSUMPTION
@@ -186,7 +186,7 @@ cost_rate_ala:
     base: 0.32
     high: 0.36
   how_to_verify: 仕入額と売上の比率を 1 か月分集計する
-  value: 0.36
+  value: 0.28
 cost_rate_course:
   unit: ratio
   status: ASSUMPTION
@@ -196,7 +196,7 @@ cost_rate_course:
     base: 0.32
     high: 0.36
   how_to_verify: コースの仕入額を 1 か月分集計する
-  value: 0.36
+  value: 0.28
 rent_monthly:
   unit: yen/month
   status: ASSUMPTION
@@ -206,7 +206,7 @@ rent_monthly:
     base: 800000
     high: 1000000
   how_to_verify: 賃貸契約書で賃料を確認する
-  value: 1000000
+  value: 600000
 other_expenses_monthly:
   unit: yen/month
   status: ASSUMPTION
@@ -237,7 +237,14 @@ other_expenses_monthly:
       telecom: 24000
       accounting: 36000
   how_to_verify: 直近 3 か月の請求書で費目別に確認する
-  value: *id004
+  value:
+    utilities: 96000
+    card_fee: 48000
+    supplies: 40000
+    advertising: 32000
+    insurance: 16000
+    telecom: 16000
+    accounting: 24000
 owner_hours_monthly:
   unit: hours/month
   status: ASSUMPTION
@@ -276,7 +283,10 @@ full_time_staff:
       count: 2
       monthly_salary: 320000
   how_to_verify: 在籍人数と給与を店に確認する
-  value: *id005
+  value:
+  - role: 店長
+    count: 1
+    monthly_salary: 280000
 part_time_staff:
   unit: staff
   status: ASSUMPTION
@@ -295,7 +305,10 @@ part_time_staff:
       hours_per_day: 6
       hourly_wage: 1400
   how_to_verify: シフト表で延べ人数と時間を確認する
-  value: *id006
+  value:
+    heads_per_day: 1
+    hours_per_day: 4
+    hourly_wage: 1280
 independence_cost_monthly:
   unit: yen/month
   status: ASSUMPTION
@@ -305,7 +318,7 @@ independence_cost_monthly:
     base: 80000
     high: 120000
   how_to_verify: 外注見積もりを取る
-  value: 120000
+  value: 50000
 depreciation_monthly:
   unit: yen/month
   status: ASSUMPTION
@@ -315,7 +328,7 @@ depreciation_monthly:
     base: 50000
     high: 100000
   how_to_verify: 設備の取得価額と耐用年数を確認する
-  value: 100000
+  value: 0
 loan_principal_monthly:
   unit: yen/month
   status: ASSUMPTION
@@ -325,7 +338,7 @@ loan_principal_monthly:
     base: 100000
     high: 150000
   how_to_verify: 借入契約の返済予定表を確認する
-  value: 150000
+  value: 0
 loan_interest_monthly:
   unit: yen/month
   status: ASSUMPTION
@@ -335,7 +348,7 @@ loan_interest_monthly:
     base: 10000
     high: 20000
   how_to_verify: 借入契約の利率を確認する
-  value: 20000
+  value: 0
 capex_monthly:
   unit: yen/month
   status: ASSUMPTION
@@ -345,4 +358,4 @@ capex_monthly:
     base: 0
     high: 50000
   how_to_verify: 設備投資の予定を確認する
-  value: 50000
+  value: 0
