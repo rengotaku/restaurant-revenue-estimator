@@ -84,11 +84,6 @@ def sensitivity(
     max_rows: int | None = None,
 ) -> list[SensitivityRow]:
     """ASSUMPTION は low/high、UNRESOLVED は候補ごとに振る. 同じ seed を使う."""
-    baseline = evaluate(data_dir, request)[0]
-    inputs = load_store(data_dir / "stores" / request.store_id)
-    assumptions = (
-        inputs.files.get(f"assumptions/{request.assumption_set}.yaml", {}) or {}
-    )
     small = EvaluationRequest(
         store_id=request.store_id,
         assumption_set=request.assumption_set,
@@ -98,6 +93,11 @@ def sensitivity(
         replications=max(1, min(request.replications, 5)),
         overrides=request.overrides,
         saturday_closure=request.saturday_closure,
+    )
+    baseline = evaluate(data_dir, small)[0]
+    inputs = load_store(data_dir / "stores" / request.store_id)
+    assumptions = (
+        inputs.files.get(f"assumptions/{request.assumption_set}.yaml", {}) or {}
     )
 
     rows: list[SensitivityRow] = []
