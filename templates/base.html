@@ -38,6 +38,14 @@
         </div>
     </header>
 
+    {% if banner %}
+    <div class="bg-blue-600 text-white font-medium text-sm py-2 px-4 shadow-sm">
+        <div class="max-w-6xl mx-auto">
+            {{ banner }}
+        </div>
+    </div>
+    {% endif %}
+
     <div class="bg-amber-50 border-b border-amber-200">
         <p class="max-w-6xl mx-auto px-4 py-2 text-xs text-amber-900">
             これはシナリオであって実績でも予測でもない。実績データで誤差を測るまでは、出力を予測として扱わない。

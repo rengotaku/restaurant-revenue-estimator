@@ -95,6 +95,7 @@ def execute_run(
     inputs = load_store(data_dir / "stores" / store_id)
     run_hash = input_hash(inputs, req.overrides)
     repository = RunRepository(session)
+    target_scenario_id = scenario.id if scenario else None
     cached = repository.find(
         store_id=store_id,
         input_hash=run_hash,
@@ -103,6 +104,7 @@ def execute_run(
         assumption_set=req.assumption_set,
         calendar_mode=req.calendar_mode,
         year=req.year,
+        scenario_id=target_scenario_id,
     )
     if cached is not None:
         return cached

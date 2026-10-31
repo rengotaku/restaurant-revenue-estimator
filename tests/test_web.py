@@ -211,6 +211,7 @@ def test_simulator_saves_and_loads_scenario(client: TestClient) -> None:
     response = client.post(
         "/stores/birdman_tamachi/simulator",
         data={
+            "floor2_choice": "custom",
             "floor2_4p": "6",
             "floor2_2p": "0",
             "replications": "1",
@@ -246,12 +247,13 @@ def test_costs_page_warns_below_minimum_wage_and_shows_owner_separately(
             },
         },
     ).json()
-    client.post(
+    response = client.post(
         "/stores/birdman_tamachi/simulator",
         data={"scenario_id": str(scenario["id"]), "replications": "1"},
         follow_redirects=False,
     )
-    page = client.get("/stores/birdman_tamachi/costs")
+    run_id = response.headers["location"].split("run=")[1].split("&")[0]
+    page = client.get(f"/stores/birdman_tamachi/costs?run={run_id}")
     assert page.status_code == 200
     assert "最低賃金" in page.text
     assert "店主の労働対価（別列）" in page.text

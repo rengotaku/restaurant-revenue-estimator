@@ -1,8 +1,26 @@
 """SQLite のシナリオと実行履歴."""
 
+import json
+
 from sqlmodel import Session, select
 
 from restaurant_revenue_estimator.models import Run, Scenario
+
+
+def is_default_run(run: Run) -> bool:
+    """実行が標準の評価（上書きなし・standard・steady・2026）か判定する."""
+    if (
+        run.assumption_set != "standard"
+        or run.scenario_id is not None
+        or run.calendar_mode != "steady"
+        or run.year != 2026
+    ):
+        return False
+    try:
+        payload = json.loads(run.result_json)
+        return not bool(payload.get("meta", {}).get("overrides"))
+    except Exception:
+        return False
 
 
 class ScenarioRepository:
@@ -44,6 +62,7 @@ class RunRepository:
         assumption_set: str,
         calendar_mode: str,
         year: int,
+        scenario_id: int | None = None,
     ) -> Run | None:
         statement = select(Run).where(
             Run.store_id == store_id,
@@ -53,6 +72,7 @@ class RunRepository:
             Run.assumption_set == assumption_set,
             Run.calendar_mode == calendar_mode,
             Run.year == year,
+            Run.scenario_id == scenario_id,
         )
         return self.session.exec(statement).first()
 
@@ -74,3 +94,21 @@ class RunRepository:
         statement = select(Run).where(Run.store_id == store_id)
         statement = statement.order_by(Run.created_at.desc())  # type: ignore[attr-defined]
         return self.session.exec(statement).first()
+
+    def latest_default(self, store_id: str) -> Run | None:
+        statement = (
+            select(Run)
+            .where(
+                Run.store_id == store_id,
+                Run.assumption_set == "standard",
+                Run.scenario_id.is_(None),  # type: ignore[union-attr]
+                Run.calendar_mode == "steady",
+                Run.year == 2026,
+            )
+            .order_by(Run.created_at.desc())  # type: ignore[attr-defined]
+        )
+        for run in self.session.exec(statement):
+            if is_default_run(run):
+                return run
+        return None
+
