@@ -189,11 +189,12 @@ class TestMakefileRunTarget:
         run_section = _extract_target_section(content, "run")
         assert "PORT" in run_section
 
-    def test_run_target_binds_to_all_interfaces(self) -> None:
-        """run ターゲットが 0.0.0.0 にバインドすること."""
+    def test_run_target_binds_to_loopback(self) -> None:
+        """run ターゲットが 127.0.0.1 にバインドすること (ADR 0002)."""
         content = _read_makefile()
         run_section = _extract_target_section(content, "run")
-        assert "0.0.0.0" in run_section
+        assert "127.0.0.1" in run_section
+        assert "0.0.0.0" not in run_section
 
     def test_run_target_runs_tailwind_watch(self) -> None:
         """run ターゲットが Tailwind --watch を起動すること."""

@@ -21,7 +21,7 @@ run: _build-assets
 	fi; \
 	echo "Starting Tailwind CSS watch + uvicorn dev server on port $$_port..."; \
 	npx @tailwindcss/cli -i static/css/input.css -o static/css/style.css --watch & \
-	uv run uvicorn restaurant_revenue_estimator.app:app --reload --host 0.0.0.0 --port $$_port
+	uv run uvicorn restaurant_revenue_estimator.app:app --reload --host 127.0.0.1 --port $$_port
 
 ## lint: Run ruff linter
 lint:
