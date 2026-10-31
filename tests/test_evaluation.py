@@ -1,8 +1,10 @@
 """評価の再現性・感度・シナリオ (TC-12-xx)."""
 
+import shutil
 from pathlib import Path
 
 import pytest
+import yaml
 
 from restaurant_revenue_estimator.engine.scenario import (
     compare_assumption_sets,
@@ -102,3 +104,92 @@ def test_both_stores_evaluate(store_id: str) -> None:
     results = evaluate(DATA, _request(store_id=store_id, replications=1))
     assert results
     assert results[0].gross_inc_tax > 0
+
+
+def test_tc_12_02(tmp_path: Path) -> None:
+    tmp_data = tmp_path / "data"
+    shutil.copytree(DATA, tmp_data)
+    standard_yaml = (
+        tmp_data / "stores" / "birdman_tamachi" / "assumptions" / "standard.yaml"
+    )
+    content = yaml.safe_load(standard_yaml.read_text(encoding="utf-8"))
+    content["unused_probe"] = {
+        "status": "ASSUMPTION",
+        "value": 1,
+        "range": {"low": 0, "base": 1, "high": 2},
+        "justification": "テスト用",
+        "how_to_verify": "テスト用確認手順",
+    }
+    standard_yaml.write_text(
+        yaml.safe_dump(content, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    rows = sensitivity(
+        tmp_data, EvaluationRequest(store_id="birdman_tamachi", replications=20)
+    )
+
+    unused_rows = [row for row in rows if row.key == "unused_probe"]
+    assert len(unused_rows) == 2
+    for row in unused_rows:
+        assert row.delta_revenue == 0
+        assert row.delta_income == 0
+
+    unused_indices = [i for i, row in enumerate(rows) if row.key == "unused_probe"]
+    nonzero_indices = [i for i, row in enumerate(rows) if row.magnitude != 0]
+    min_unused_idx = min(unused_indices)
+    assert all(i < min_unused_idx for i in nonzero_indices)
+
+
+def test_tc_12_03(tmp_path: Path) -> None:
+    tmp_data = tmp_path / "data"
+    shutil.copytree(DATA, tmp_data)
+    standard_yaml = (
+        tmp_data / "stores" / "birdman_tamachi" / "assumptions" / "standard.yaml"
+    )
+    content = yaml.safe_load(standard_yaml.read_text(encoding="utf-8"))
+
+    dinner = content["dinner_demand_by_weekday"]
+    base_dinner = (
+        dinner["range"]["base"]
+        if "range" in dinner and "base" in dinner["range"]
+        else dinner["value"]
+    )
+    if "range" not in dinner:
+        dinner["range"] = {}
+    dinner["range"]["low"] = {k: round(v * 0.7) for k, v in base_dinner.items()}
+    dinner["range"]["high"] = {k: round(v * 1.3) for k, v in base_dinner.items()}
+
+    lunch = content["lunch_avg_ticket"]
+    if "range" not in lunch:
+        lunch["range"] = {}
+    lunch["range"]["low"] = 1100
+    lunch["range"]["high"] = 1160
+
+    standard_yaml.write_text(
+        yaml.safe_dump(content, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    rows = sensitivity(
+        tmp_data, EvaluationRequest(store_id="birdman_tamachi", replications=5)
+    )
+
+    dinner_ranks = [
+        i for i, row in enumerate(rows) if row.key == "dinner_demand_by_weekday"
+    ]
+    lunch_ranks = [
+        i for i, row in enumerate(rows) if row.key == "lunch_avg_ticket"
+    ]
+    assert min(dinner_ranks) < min(lunch_ranks)
+
+
+def test_tc_f3_01() -> None:
+    res20 = sensitivity(
+        DATA, EvaluationRequest(store_id="birdman_tamachi", replications=20)
+    )
+    res5 = sensitivity(
+        DATA, EvaluationRequest(store_id="birdman_tamachi", replications=5)
+    )
+    assert res20 == res5
+
