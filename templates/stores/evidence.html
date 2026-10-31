@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}根拠・監査 - {{ store_id }}{% endblock %}
+
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <h1 class="text-2xl font-bold text-gray-800">根拠・監査</h1>
+    <form method="get" class="flex items-center gap-2 text-sm">
+        <label for="status" class="text-gray-500">ステータス</label>
+        <select id="status" name="status" class="border rounded px-2 py-1" onchange="this.form.submit()">
+            <option value="">すべて</option>
+            {% for item in statuses %}
+            <option value="{{ item }}" {% if item == status %}selected{% endif %}>{{ item }}</option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+
+<div class="bg-white rounded-lg shadow overflow-x-auto">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-500">
+            <tr>
+                <th class="px-4 py-3 text-left">キー</th>
+                <th class="px-4 py-3 text-left">ステータス</th>
+                <th class="px-4 py-3 text-left">値</th>
+                <th class="px-4 py-3 text-left">出典</th>
+                <th class="px-4 py-3 text-left">取得日</th>
+                <th class="px-4 py-3 text-left">注記</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for row in rows %}
+            <tr class="align-top hover:bg-gray-50">
+                <td class="px-4 py-2 font-mono text-xs">{{ row.path }}</td>
+                <td class="px-4 py-2">{{ row.status }}</td>
+                <td class="px-4 py-2">{{ row.value }}</td>
+                <td class="px-4 py-2 break-all text-xs">{{ row.sources }}</td>
+                <td class="px-4 py-2 text-xs">{{ row.accessed }}</td>
+                <td class="px-4 py-2 text-xs text-gray-500">{{ row.note }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="px-4 py-6 text-center text-gray-500">該当なし</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

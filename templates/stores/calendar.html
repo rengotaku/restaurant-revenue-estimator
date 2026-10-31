@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}年カレンダー - {{ store_id }}{% endblock %}
+
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <h1 class="text-2xl font-bold text-gray-800">年カレンダー</h1>
+    <form method="get" class="flex flex-wrap items-center gap-2 text-sm">
+        <label class="text-gray-500" for="mode">暦</label>
+        <select id="mode" name="mode" class="border rounded px-2 py-1" onchange="this.form.submit()">
+            <option value="steady" {% if mode == 'steady' %}selected{% endif %}>定常年</option>
+            <option value="historical" {% if mode == 'historical' %}selected{% endif %}>暦年</option>
+        </select>
+        {% if candidate_names | length > 1 %}
+        <label class="text-gray-500" for="candidate">土曜定休の開始</label>
+        <select id="candidate" name="candidate" class="border rounded px-2 py-1" onchange="this.form.submit()">
+            {% for name in candidate_names %}
+            <option value="{{ name }}" {% if name == candidate %}selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+        </select>
+        {% endif %}
+        <input type="hidden" name="year" value="{{ year }}">
+    </form>
+</div>
+
+<p class="text-sm text-gray-600 mb-4">営業日 {{ open_count }} 日（{{ year }} 年・{{ '定常年' if mode == 'steady' else '暦年' }}）</p>
+
+<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    {% for month in months %}
+    <section class="bg-white rounded-lg shadow p-4">
+        <h2 class="font-bold text-gray-700 mb-2">{{ month.month }} 月</h2>
+        <ul class="text-xs space-y-1">
+            {% for day in month.days %}
+            <li class="flex items-center justify-between gap-2">
+                <span class="{% if not day.is_open %}text-gray-400{% endif %}">
+                    {{ day.day.day }} 日（{{ day.weekday }}）
+                    {% if day.holiday %}<span class="text-red-600">{{ day.holiday }}</span>{% endif %}
+                </span>
+                <span class="text-gray-500">
+                    {% if day.lunch %}昼{% endif %}{% if day.dinner %}夜{% endif %}
+                    {% if not day.is_open %}{{ day.closed_reason }}{% endif %}
+                    {% if day.note %}<span class="text-amber-700">{{ day.status }}: {{ day.note }}</span>{% endif %}
+                </span>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endfor %}
+</div>
+{% endblock %}

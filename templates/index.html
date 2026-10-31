@@ -3,11 +3,43 @@
 {% block title %}店舗一覧 - 店舗収益評価{% endblock %}
 
 {% block content %}
-<div class="mb-6">
+<div class="mb-6 flex items-center justify-between">
     <h1 class="text-2xl font-bold text-gray-800">店舗一覧</h1>
+    <span class="text-sm text-gray-500">{{ stores | length }} 店舗</span>
 </div>
 
+{% if stores %}
+<div class="bg-white rounded-lg shadow overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-500">
+            <tr>
+                <th class="px-6 py-3 text-left">店舗</th>
+                <th class="px-6 py-3 text-left">住所</th>
+                <th class="px-6 py-3 text-right">年間税込売上</th>
+                <th class="px-6 py-3 text-right">事業所得相当</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for store in stores %}
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-3">
+                    <a class="text-blue-700 hover:underline" href="/stores/{{ store.store_id }}">{{ store.name }}</a>
+                </td>
+                <td class="px-6 py-3 text-gray-500">{{ store.address }}</td>
+                <td class="px-6 py-3 text-right">
+                    {% if latest.get(store.store_id) %}{{ "{:,}".format(latest[store.store_id].gross) }} 円{% else %}—{% endif %}
+                </td>
+                <td class="px-6 py-3 text-right">
+                    {% if latest.get(store.store_id) %}{{ "{:,}".format(latest[store.store_id].income) }} 円{% else %}—{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
 <div class="bg-white rounded-lg shadow p-8 text-center text-gray-500">
     <p>まだ店舗がありません。</p>
 </div>
+{% endif %}
 {% endblock %}

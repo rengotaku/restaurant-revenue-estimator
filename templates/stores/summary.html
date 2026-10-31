@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}{{ summary.name }} - 店舗収益評価{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold text-gray-800 mb-6">{{ summary.name }}</h1>
+
+<div class="grid gap-6 md:grid-cols-2">
+    <section class="bg-white rounded-lg shadow p-6">
+        <h2 class="font-bold text-gray-800 mb-3">店舗と根拠</h2>
+        <dl class="text-sm space-y-1">
+            <div class="flex gap-2"><dt class="w-24 text-gray-500">住所</dt><dd>{{ summary.address }}</dd></div>
+            <div class="flex gap-2"><dt class="w-24 text-gray-500">電話</dt><dd>{{ summary.phone }}</dd></div>
+            <div class="flex gap-2"><dt class="w-24 text-gray-500">出典の取得日</dt><dd>{{ summary.source_from }} 〜 {{ summary.source_to }}</dd></div>
+            <div class="flex gap-2"><dt class="w-24 text-gray-500">営業ルール</dt>
+                <dd>{% for rule in summary.rules %}{{ rule.id }}（{{ rule["from"] }} 〜 {{ rule["to"] }}）{% endfor %}</dd>
+            </div>
+        </dl>
+        <p class="mt-4 text-sm text-gray-600">
+            {% if summary.related_names %}
+            姉妹店（{{ summary.related_names | join('、') }}）を含めていない。
+            {% else %}
+            姉妹店の混入は無い。
+            {% endif %}
+        </p>
+    </section>
+
+    <section class="bg-white rounded-lg shadow p-6">
+        <h2 class="font-bold text-gray-800 mb-3">評価の要約</h2>
+        <dl class="text-sm space-y-1">
+            <div class="flex justify-between"><dt class="text-gray-500">年間税込売上</dt><dd>{{ "{:,}".format(result.revenue.total_inc_tax) }} 円</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500">年間税抜売上</dt><dd>{{ "{:,}".format(result.revenue.total_ex_tax) }} 円</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500">事業所得相当</dt><dd>{{ "{:,}".format(result.pnl.business_income) }} 円</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500">店主の労働対価（別列）</dt><dd>{{ "{:,}".format(result.pnl.owner_labor) }} 円</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500">営業日</dt><dd>{{ result.open_days }} 日</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500">2 階の候補</dt><dd>{{ result.variant }}</dd></div>
+        </dl>
+        <p class="mt-4 text-xs text-gray-500">run #{{ run.id }} / seed {{ run.seed }} / replications {{ run.replications }}</p>
+    </section>
+</div>
+
+<section class="bg-white rounded-lg shadow p-6 mt-6">
+    <h2 class="font-bold text-gray-800 mb-3">入力のステータス別件数</h2>
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-500">
+            <tr><th class="px-3 py-2 text-left">ステータス</th><th class="px-3 py-2 text-right">件数</th></tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for status, count in summary.status_counts.items() %}
+            <tr><td class="px-3 py-2">{{ status }}</td><td class="px-3 py-2 text-right">{{ count }}</td></tr>
+            {% endfor %}
+            <tr class="font-bold"><td class="px-3 py-2">合計</td><td class="px-3 py-2 text-right">{{ summary.total_keys }}</td></tr>
+        </tbody>
+    </table>
+    <p class="mt-3 text-sm"><a class="text-blue-700 hover:underline" href="/stores/{{ store_id }}/evidence">根拠一覧を開く</a></p>
+</section>
+{% endblock %}

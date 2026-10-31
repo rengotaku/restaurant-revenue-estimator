@@ -21,10 +21,11 @@ class TestIndexPage:
         response = client.get("/")
         assert "店舗一覧" in response.text
 
-    def test_index_shows_empty_state(self, client: TestClient) -> None:
-        """店舗が無いことを表示する."""
+    def test_index_lists_stores(self, client: TestClient) -> None:
+        """入力済みの店舗が一覧に出る."""
         response = client.get("/")
-        assert "まだ店舗がありません" in response.text
+        assert "バードマン田町店" in response.text
+        assert "秋葉原 とら八" in response.text
 
 
 class TestRemovedSampleRoutes:

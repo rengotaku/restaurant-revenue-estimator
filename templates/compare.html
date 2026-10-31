@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}比較 - 店舗収益評価{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold text-gray-800 mb-4">比較</h1>
+
+<form method="get" class="bg-white rounded-lg shadow p-4 mb-6 flex flex-wrap items-end gap-3 text-sm">
+    <label class="flex-1">比較する run の id（カンマ区切り）
+        <input name="runs" value="{{ runs_query }}" class="border rounded px-2 py-1 w-full" placeholder="例: 1,2">
+    </label>
+    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">比較する</button>
+</form>
+
+{% if error %}
+<p class="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">{{ error }}</p>
+{% endif %}
+
+{% if recent %}
+<section class="bg-white rounded-lg shadow p-4 mb-6">
+    <h2 class="font-bold text-gray-800 mb-2">最近の実行</h2>
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-500"><tr><th class="px-3 py-2 text-left">run</th><th class="px-3 py-2 text-left">店舗</th><th class="px-3 py-2 text-left">仮定</th><th class="px-3 py-2 text-left">年</th><th class="px-3 py-2 text-left">暦</th></tr></thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for run in recent %}
+            <tr>
+                <td class="px-3 py-2"><a class="text-blue-700 hover:underline" href="/compare?runs={{ run.id }}">{{ run.id }}</a></td>
+                <td class="px-3 py-2">{{ run.store_id }}</td>
+                <td class="px-3 py-2">{{ run.assumption_set }}</td>
+                <td class="px-3 py-2">{{ run.year }}</td>
+                <td class="px-3 py-2">{{ run.calendar_mode }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
+{% if rows %}
+<div class="grid gap-4 md:grid-cols-2">
+    {% for row in rows %}
+    <section class="bg-white rounded-lg shadow p-4">
+        <h2 class="font-bold text-gray-800">{{ row.store_id }} / {{ row.assumption_set }} / {{ row.variant }}</h2>
+        <p class="text-xs text-gray-500 mb-2">{{ row.year }} 年・{{ row.calendar_mode }}・seed {{ row.meta.seed }}</p>
+        <dl class="text-sm space-y-1">
+            <div class="flex justify-between"><dt class="text-gray-500">年間税込売上</dt><dd>{{ "{:,}".format(row.revenue.total_inc_tax) }} 円</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500">粗利</dt><dd>{{ "{:,}".format(row.pnl.gross_profit) }} 円</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500">事業所得相当</dt><dd>{{ "{:,}".format(row.pnl.business_income) }} 円</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500">店主の労働対価（別列）</dt><dd>{{ "{:,}".format(row.pnl.owner_labor) }} 円</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500">営業日</dt><dd>{{ row.open_days }} 日</dd></div>
+        </dl>
+    </section>
+    {% endfor %}
+</div>
+<p class="text-xs text-gray-500 mt-2">並びは選んだ順。売上順の並べ替えや順位は付けない。</p>
+{% endif %}
+{% endblock %}

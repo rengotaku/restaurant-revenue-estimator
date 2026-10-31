@@ -31,6 +31,7 @@ node_modules/
 # Build outputs
 static/css/style.css
 static/js/alpine.js
+static/js/chart.js
 
 # Database
 *.db

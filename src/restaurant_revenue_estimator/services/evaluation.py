@@ -312,8 +312,13 @@ def evaluate(
             saturday_closure=None,
         )[0]
 
-    floors, _, variants = _floors(inputs)
-    if floor_choice and floor_choice != "default":
+    floors, fixed, variants = _floors(inputs)
+    if isinstance(floor_choice, list):
+        custom = [
+            Table(str(item["id"]), int(item["seats"]), "2f") for item in floor_choice
+        ]
+        variants = [("custom", [*fixed, *custom])]
+    elif floor_choice and floor_choice != "default":
         variants = [item for item in variants if item[0] == floor_choice] or variants
 
     results: list[EvaluationResult] = []

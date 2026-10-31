@@ -33,6 +33,7 @@ class DaySchedule:
     dinner: ServiceHours | None
     closed_reason: str | None
     status: str
+    note: str | None = None
 
     @property
     def is_open(self) -> bool:
@@ -138,6 +139,7 @@ def build_series(
     holidays: dict[date, str],
     exceptions: list[dict[str, Any]] | None = None,
     saturday_closure_start: date | None = None,
+    saturday_hours: dict[str, Any] | None = None,
     name: str = "default",
 ) -> CalendarSeries:
     """1 本の営業日系列を作る."""
@@ -168,6 +170,7 @@ def build_series(
                             None,
                             "exception",
                             str(exception.get("status", "ASSUMPTION")),
+                            str(exception.get("note") or ""),
                         )
                     )
                     continue
@@ -182,6 +185,7 @@ def build_series(
                         dinner,
                         None,
                         str(exception.get("status", "ASSUMPTION")),
+                        str(exception.get("note") or ""),
                     )
                 )
                 continue
@@ -214,6 +218,26 @@ def build_series(
                         None,
                         "saturday_closure",
                         "PUBLIC_VERIFIED",
+                    )
+                )
+                continue
+
+            if (
+                weekday == "sat"
+                and saturday_hours is not None
+                and (saturday_closure_start is None or current < saturday_closure_start)
+            ):
+                lunch = _hours(saturday_hours.get("lunch"))
+                dinner = _hours(saturday_hours.get("dinner"))
+                days.append(
+                    DaySchedule(
+                        current,
+                        weekday,
+                        holiday,
+                        lunch,
+                        dinner,
+                        None,
+                        "UNRESOLVED",
                     )
                 )
                 continue
@@ -275,6 +299,7 @@ def build_calendars(
     holidays: dict[date, str],
     exceptions: list[dict[str, Any]] | None = None,
     saturday_closure_candidates: dict[str, date | None] | None = None,
+    saturday_hours: dict[str, Any] | None = None,
 ) -> list[CalendarSeries]:
     """UNRESOLVED の開始日は候補ごとに系列を出す."""
     if not saturday_closure_candidates:
@@ -295,6 +320,7 @@ def build_calendars(
             holidays=holidays,
             exceptions=exceptions,
             saturday_closure_start=start,
+            saturday_hours=saturday_hours,
             name=candidate,
         )
         for candidate, start in saturday_closure_candidates.items()
@@ -315,9 +341,17 @@ def calendars_for_store(
     rules = rules_value.get("value", []) if isinstance(rules_value, dict) else []
     exceptions_value = (operations.get("exceptions") or {}).get("value", [])
     candidates: dict[str, date | None] = {}
+    saturday_hours: dict[str, Any] | None = None
+    if mode == "historical":
+        raw_hours = (operations.get("saturday_hours_before_closure") or {}).get(
+            "candidates"
+        ) or {}
+        saturday_hours = raw_hours.get("same_as_weekday") or next(
+            iter(raw_hours.values()), None
+        )
     if saturday_closure_start:
         candidates = {"selected": date.fromisoformat(saturday_closure_start)}
-    else:
+    elif mode == "historical":
         unresolved = operations.get("saturday_closure_start") or {}
         for candidate in unresolved.get("candidates", {}) or {}:
             candidates[candidate] = date.fromisoformat(candidate)
@@ -328,4 +362,5 @@ def calendars_for_store(
         holidays=holidays,
         exceptions=exceptions_value,
         saturday_closure_candidates=candidates or None,
+        saturday_hours=saturday_hours,
     )

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}人件費・費用 - {{ store_id }}{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold text-gray-800 mb-4">人件費・費用</h1>
+
+{% for warning in warnings %}
+<p class="mb-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">{{ warning }}</p>
+{% endfor %}
+
+<div class="grid gap-6 md:grid-cols-2">
+    <section class="bg-white rounded-lg shadow p-4">
+        <h2 class="font-bold text-gray-800 mb-2">月次の損益段階</h2>
+        <table class="w-full text-sm">
+            <tbody class="divide-y divide-gray-100">
+                <tr><td class="py-2 text-gray-500">税込売上</td><td class="py-2 text-right">{{ "{:,}".format(pnl.gross_inc_tax) }}</td></tr>
+                <tr><td class="py-2 text-gray-500">税抜売上</td><td class="py-2 text-right">{{ "{:,}".format(pnl.gross_ex_tax) }}</td></tr>
+                <tr><td class="py-2 text-gray-500">粗利</td><td class="py-2 text-right">{{ "{:,}".format(pnl.gross_profit) }}</td></tr>
+                <tr><td class="py-2 text-gray-500">店舗営業利益</td><td class="py-2 text-right">{{ "{:,}".format(pnl.store_operating_profit) }}</td></tr>
+                <tr><td class="py-2 text-gray-500">事業所得相当</td><td class="py-2 text-right font-medium">{{ "{:,}".format(pnl.business_income) }}</td></tr>
+                <tr><td class="py-2 text-gray-500">CF</td><td class="py-2 text-right">{{ "{:,}".format(pnl.cash_flow) }}</td></tr>
+                <tr><td class="py-2 text-gray-500">店主の労働対価（別列）</td><td class="py-2 text-right">{{ "{:,}".format(pnl.owner_labor) }}</td></tr>
+            </tbody>
+        </table>
+        <p class="text-xs text-gray-500 mt-2">店主の労働対価は事業所得相当に含めない。両者を足した列は作らない。</p>
+    </section>
+
+    <section class="bg-white rounded-lg shadow p-4">
+        <h2 class="font-bold text-gray-800 mb-2">費目</h2>
+        <table class="w-full text-sm">
+            <tbody class="divide-y divide-gray-100">
+                <tr><td class="py-2 text-gray-500">人件費</td><td class="py-2 text-right">{{ "{:,}".format(pnl.labor) }}</td></tr>
+                <tr><td class="py-2 text-gray-500">原価</td><td class="py-2 text-right">{{ "{:,}".format(pnl.cogs) }}</td></tr>
+                <tr><td class="py-2 text-gray-500">家賃</td><td class="py-2 text-right">{{ "{:,}".format(pnl.rent) }}</td></tr>
+                <tr><td class="py-2 text-gray-500">その他販管費</td><td class="py-2 text-right">{{ "{:,}".format(pnl.other_expenses) }}</td></tr>
+                <tr><td class="py-2 text-gray-500">減価償却</td><td class="py-2 text-right">{{ "{:,}".format(pnl.depreciation) }}</td></tr>
+                <tr><td class="py-2 text-gray-500">支払利息</td><td class="py-2 text-right">{{ "{:,}".format(pnl.interest) }}</td></tr>
+                <tr><td class="py-2 text-gray-500">元本返済（CF のみ）</td><td class="py-2 text-right">{{ "{:,}".format(pnl.principal) }}</td></tr>
+            </tbody>
+        </table>
+        <p class="text-xs text-gray-500 mt-2">アルバイトの時給・人数は仮定ファイルの値。22:00〜5:00 は 25% 以上を割増する。</p>
+    </section>
+</div>
+
+<section class="bg-white rounded-lg shadow p-4 mt-6">
+    <h2 class="font-bold text-gray-800 mb-2">公庫の経営指標との照合</h2>
+    <p class="text-xs text-gray-600 mb-2">
+        売上は税込、人件費に店主の労働対価を含めて換算した。分母と範囲の定義が違うため、外れていても誤りとは扱わない。
+    </p>
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-500"><tr><th class="px-3 py-2 text-left">指標</th><th class="px-3 py-2 text-right">推計</th><th class="px-3 py-2 text-right">公庫平均</th></tr></thead>
+        <tbody class="divide-y divide-gray-100">
+            <tr><td class="px-3 py-2">総利益率</td><td class="px-3 py-2 text-right">{{ "%.1f"|format(jfc.gross_profit_ratio * 100) }}%</td><td class="px-3 py-2 text-right">67.8%</td></tr>
+            <tr><td class="px-3 py-2">人件費率</td><td class="px-3 py-2 text-right">{{ "%.1f"|format(jfc.labor_ratio * 100) }}%</td><td class="px-3 py-2 text-right">32.2%</td></tr>
+            <tr><td class="px-3 py-2">営業利益率</td><td class="px-3 py-2 text-right">{{ "%.1f"|format(jfc.operating_margin * 100) }}%</td><td class="px-3 py-2 text-right">-1.8%</td></tr>
+        </tbody>
+    </table>
+</section>
+{% endblock %}

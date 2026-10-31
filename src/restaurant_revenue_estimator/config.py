@@ -1,5 +1,6 @@
 """アプリケーション設定: pydantic-settings で env を解決する."""
 
+import os
 from pathlib import Path
 
 from pydantic import Field
@@ -40,6 +41,11 @@ def get_settings() -> Settings:
     if _settings is None:
         _settings = Settings()
     return _settings
+
+
+def data_directory() -> Path:
+    """入力 YAML の置き場所. テストでは RRE_DATA_DIR で差し替える."""
+    return Path(os.environ.get("RRE_DATA_DIR", str(_BASE_DIR / "data")))
 
 
 def reset_settings() -> None:

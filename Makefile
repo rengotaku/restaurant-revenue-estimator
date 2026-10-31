@@ -89,6 +89,11 @@ _copy-alpine:
 	else \
 		echo "Warning: node_modules not found, skipping Alpine.js copy (run 'npm install' first)"; \
 	fi
+	@if [ -f node_modules/chart.js/dist/chart.umd.js ]; then \
+		cp node_modules/chart.js/dist/chart.umd.js static/js/chart.js; \
+	else \
+		echo "Warning: chart.js not found, skipping Chart.js copy (run 'npm install' first)"; \
+	fi
 
 _build-assets: _copy-alpine
 	@if command -v npx >/dev/null 2>&1 && [ -d node_modules ]; then \

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}改善優先順位 - {{ store_id }}{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold text-gray-800 mb-4">改善優先順位</h1>
+<p class="text-sm text-gray-600 mb-4">
+    感度の大きい順。金額は年間税込売上と事業所得相当の振れ幅。確かめ方が付いているものを上から調べる。
+</p>
+
+<div class="bg-white rounded-lg shadow p-4 mb-6">
+    <canvas id="sensitivity-chart" height="120"></canvas>
+</div>
+
+<div class="bg-white rounded-lg shadow overflow-x-auto">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-500">
+            <tr>
+                <th class="px-4 py-3 text-left">入力</th>
+                <th class="px-4 py-3 text-left">振った値</th>
+                <th class="px-4 py-3 text-right">年間税込売上の差</th>
+                <th class="px-4 py-3 text-right">事業所得相当の差</th>
+                <th class="px-4 py-3 text-left">確かめ方</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for row in rows %}
+            <tr class="align-top">
+                <td class="px-4 py-2 font-mono text-xs">{{ row.key }}</td>
+                <td class="px-4 py-2">{{ row.value_name }}{% if row.value != row.value_name %}: {{ row.value }}{% endif %}</td>
+                <td class="px-4 py-2 text-right">{{ "{:,}".format(row.delta_revenue) }}</td>
+                <td class="px-4 py-2 text-right">{{ "{:,}".format(row.delta_income) }}</td>
+                <td class="px-4 py-2 text-xs text-gray-600">{{ row.how_to_verify }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<p class="text-xs text-gray-500 mt-2">UNRESOLVED は候補ごとに並べている。代表値を 1 つ選ばない。</p>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const data = {{ chart | safe }};
+    const canvas = document.getElementById("sensitivity-chart");
+    if (!canvas || typeof Chart === "undefined") return;
+    new Chart(canvas, {
+        type: "bar",
+        data: {
+            labels: data.labels,
+            datasets: [
+                { label: "年間税込売上の差", data: data.revenue, backgroundColor: "#2563eb" },
+                { label: "事業所得相当の差", data: data.income, backgroundColor: "#f59e0b" }
+            ]
+        },
+        options: { indexAxis: "y", responsive: true, scales: { x: { ticks: { callback: v => v.toLocaleString() } } } }
+    });
+});
+</script>
+{% endblock %}

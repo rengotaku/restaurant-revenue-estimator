@@ -74,6 +74,14 @@ def result_to_dict(result: EvaluationResult) -> dict[str, Any]:
         },
         "meta": result.meta.as_dict(),
         "unresolved": list(result.unresolved),
+        "overrides": [
+            {
+                "key": key,
+                "status": "ASSUMPTION",
+                "source": f"scenario:{key}",
+            }
+            for key in result.meta.overrides
+        ],
     }
 
 

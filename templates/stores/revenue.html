@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}売上内訳 - {{ store_id }}{% endblock %}
+
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <h1 class="text-2xl font-bold text-gray-800">売上内訳</h1>
+    <div class="flex gap-2 text-sm">
+        <a class="px-3 py-1 rounded border {% if tax == 'inc' %}bg-blue-600 text-white border-blue-600{% else %}bg-white{% endif %}"
+           href="/stores/{{ store_id }}/revenue?tax=inc">税込</a>
+        <a class="px-3 py-1 rounded border {% if tax == 'ex' %}bg-blue-600 text-white border-blue-600{% else %}bg-white{% endif %}"
+           href="/stores/{{ store_id }}/revenue?tax=ex">税抜</a>
+    </div>
+</div>
+
+<div class="bg-white rounded-lg shadow p-4 mb-6">
+    <canvas id="revenue-chart" height="110"></canvas>
+</div>
+
+<div class="bg-white rounded-lg shadow overflow-x-auto">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-500">
+            <tr>
+                <th class="px-4 py-3 text-left">月</th>
+                <th class="px-4 py-3 text-right">昼</th>
+                <th class="px-4 py-3 text-right">夜</th>
+                <th class="px-4 py-3 text-right">アラカルト</th>
+                <th class="px-4 py-3 text-right">コース</th>
+                <th class="px-4 py-3 text-right">合計</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for month in months %}
+            <tr>
+                <td class="px-4 py-2">{{ month.month }} 月</td>
+                <td class="px-4 py-2 text-right">{{ "{:,}".format(month.lunch_inc_tax) }}</td>
+                <td class="px-4 py-2 text-right">{{ "{:,}".format(month.dinner_inc_tax) }}</td>
+                <td class="px-4 py-2 text-right">{{ "{:,}".format(month.ala_inc_tax) }}</td>
+                <td class="px-4 py-2 text-right">{{ "{:,}".format(month.course_inc_tax) }}</td>
+                <td class="px-4 py-2 text-right font-medium">{{ "{:,}".format(month.total_inc_tax if tax == 'inc' else month.total_ex_tax) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot class="bg-gray-50 font-bold">
+            <tr>
+                <td class="px-4 py-3">年</td>
+                <td class="px-4 py-3 text-right">{{ "{:,}".format(result.revenue.lunch_inc_tax) }}</td>
+                <td class="px-4 py-3 text-right">{{ "{:,}".format(result.revenue.dinner_inc_tax) }}</td>
+                <td class="px-4 py-3 text-right">{{ "{:,}".format(result.revenue.ala_inc_tax) }}</td>
+                <td class="px-4 py-3 text-right">{{ "{:,}".format(result.revenue.course_inc_tax) }}</td>
+                <td class="px-4 py-3 text-right">{{ "{:,}".format(total) }}</td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+<p class="text-xs text-gray-500 mt-2">円。コース客とアラカルト客は排他。季節係数は客数にだけ掛けている。</p>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const data = {{ chart | safe }};
+    const canvas = document.getElementById("revenue-chart");
+    if (!canvas || typeof Chart === "undefined") return;
+    new Chart(canvas, {
+        type: "bar",
+        data: { labels: data.labels, datasets: [{ label: "税込売上（円）", data: data.values, backgroundColor: "#2563eb" }] },
+        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { ticks: { callback: v => v.toLocaleString() } } } }
+    });
+});
+</script>
+{% endblock %}

@@ -9,7 +9,6 @@ import typer
 
 from restaurant_revenue_estimator import __version__
 from restaurant_revenue_estimator.engine.observation import fit_grid
-from restaurant_revenue_estimator.engine.scenario import sensitivity
 from restaurant_revenue_estimator.engine.tables import Table
 from restaurant_revenue_estimator.inputs import load_store, validate_all, validate_store
 from restaurant_revenue_estimator.inputs.legacy import check_legacy, format_legacy_check
@@ -24,6 +23,7 @@ from restaurant_revenue_estimator.services.evaluation import (
     evaluate,
     plain,
 )
+from restaurant_revenue_estimator.services.reporting import build_report_markdown
 
 app = typer.Typer(
     help="飲食店 1 店舗の収益を根拠付きシナリオで評価する。",
@@ -136,31 +136,14 @@ def run(
     directory = runs_dir / run_id
     directory.mkdir(parents=True, exist_ok=True)
 
-    rows = sensitivity(data_dir, request) if assumptions == "standard" else []
-    inputs = load_store(store_dir)
-    benchmark_path = data_dir / "benchmarks" / "jfc_2025_izakaya.yaml"
-    benchmark = load_benchmark(benchmark_path) if benchmark_path.exists() else None
-    legacy_lines = (
-        format_legacy_check(check_legacy(store_dir, data_dir))
-        if (store_dir / "legacy" / "v5.yaml").exists()
-        else None
-    )
+    report_text = build_report_markdown(data_dir, result, request)
 
     (directory / "result.json").write_text(
         json.dumps(result_to_dict(result), ensure_ascii=False, indent=2, sort_keys=True)
         + "\n",
         encoding="utf-8",
     )
-    (directory / "report.md").write_text(
-        render_markdown(
-            result,
-            inputs,
-            sensitivity_rows=rows,
-            legacy_lines=legacy_lines,
-            benchmark=benchmark,
-        ),
-        encoding="utf-8",
-    )
+    (directory / "report.md").write_text(report_text, encoding="utf-8")
     (directory / "run.json").write_text(
         json.dumps(
             {
