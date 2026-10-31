@@ -2,6 +2,7 @@
 
 from collections.abc import Generator
 
+from sqlalchemy import inspect, text
 from sqlalchemy.engine import Engine
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -40,7 +41,20 @@ def reset_engine() -> None:
 
 def init_db(engine: Engine | None = None) -> None:
     """テーブルが存在しない場合のみ作成する (開発用)."""
-    SQLModel.metadata.create_all(engine or get_engine())
+    target_engine = engine or get_engine()
+    SQLModel.metadata.create_all(target_engine)
+    with target_engine.connect() as conn:
+        inspector = inspect(conn)
+        if "runs" in inspector.get_table_names():
+            columns = [c["name"] for c in inspector.get_columns("runs")]
+            if "code_sha256" not in columns:
+                conn.execute(
+                    text(
+                        "ALTER TABLE runs ADD COLUMN code_sha256"
+                        " VARCHAR(64) NOT NULL DEFAULT ''"
+                    )
+                )
+                conn.commit()
 
 
 def get_session() -> Generator[Session, None, None]:

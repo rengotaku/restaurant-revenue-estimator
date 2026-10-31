@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from restaurant_revenue_estimator import code_version
 from restaurant_revenue_estimator.config import get_settings
 from restaurant_revenue_estimator.database import init_db
 from restaurant_revenue_estimator.logging_config import configure_logging, get_logger
@@ -22,6 +23,7 @@ _BASE_DIR = Path(__file__).parent.parent.parent
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:  # noqa: ARG001
     """アプリ起動時の初期化 (logging + DB)."""
     configure_logging()
+    code_version.current_code_sha256()
     init_db()
     get_logger("restaurant-revenue-estimator").info(
         "startup", env=get_settings().app_env

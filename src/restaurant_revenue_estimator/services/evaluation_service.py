@@ -7,6 +7,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 from sqlmodel import Session
 
+from restaurant_revenue_estimator import code_version
 from restaurant_revenue_estimator.inputs import input_hash, load_store
 from restaurant_revenue_estimator.models import Run, Scenario
 from restaurant_revenue_estimator.report import result_to_dict
@@ -140,6 +141,7 @@ def execute_run(
         replications=req.replications,
         input_hash=run_hash,
         model_version=result.meta.model_version,
+        code_sha256=code_version.current_code_sha256(),
         calendar_sha256=result.meta.calendar_sha256,
         result_json=json.dumps(
             result_to_dict(result), ensure_ascii=False, sort_keys=True
