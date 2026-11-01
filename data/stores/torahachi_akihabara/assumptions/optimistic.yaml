@@ -67,7 +67,7 @@ max_wait_minutes:
 dinner_demand_by_weekday:
   unit: people/day
   status: ASSUMPTION
-  justification: とら八の夜の需要は公開情報に無い。席数 150 と立地から置いた仮置き
+  justification: とら八の夜の需要は公開情報に無い。席数 150 と立地から置いた仮置き。来店を希望した人数（入店できなかった分は失った需要）
   range:
     low:
       mon: 49
@@ -159,7 +159,7 @@ course_ratio:
     base: 0.35
     high: 0.5
   how_to_verify: コース予約の人数を 1 か月分集計する
-  value: 0.5
+  value: 0.35
 discount_application_rate:
   unit: ratio
   status: ASSUMPTION
@@ -339,3 +339,167 @@ capex_monthly:
     base: 0
     high: 50000
   value: 0
+dinner_stay_minutes:
+  unit: minutes
+  status: ASSUMPTION
+  justification: 仮置き。飲み放題なしのアラカルト客の滞在
+  range:
+    low: 90
+    base: 120
+    high: 150
+  how_to_verify: 夜のアラカルト客の退店時刻を 20 組分記録する
+  value: 90
+dinner_peak_share:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 仮置き。ウォークインの到着のうち 18:30〜19:30 に来る割合
+  range:
+    low: 0.4
+    base: 0.5
+    high: 0.6
+  how_to_verify: 18:30-19:30 のウォークイン来店組数を数える
+  value: 0.4
+dinner_group_size_distribution:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 仮置き。ウォークインは 1〜4 人。5 人以上は予約で来る前提
+  range:
+    low:
+      1: 0.2
+      2: 0.5
+      3: 0.15
+      4: 0.15
+    base:
+      1: 0.15
+      2: 0.45
+      3: 0.2
+      4: 0.2
+    high: &id_dg_opt
+      1: 0.1
+      2: 0.4
+      3: 0.25
+      4: 0.25
+  how_to_verify: 夜のウォークインの組人数を 30 組分数える
+  value: *id_dg_opt
+course_party_size_distribution:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 仮置き。コース予約 1 組の人数
+  range:
+    low:
+      4: 0.6
+      6: 0.3
+      10: 0.1
+    base: &id_cp_opt
+      4: 0.5
+      6: 0.3
+      10: 0.2
+    high:
+      4: 0.4
+      6: 0.3
+      10: 0.3
+  how_to_verify: コース予約の組人数を集計する
+  value: *id_cp_opt
+course_start_window:
+  unit: time
+  status: ASSUMPTION
+  justification: 仮置き。コース予約の開始時刻の範囲（5 分刻みで一様）
+  range:
+    low:
+      start: '18:00'
+      end: '19:30'
+    base: &id_csw_opt
+      start: '18:00'
+      end: '19:30'
+    high:
+      start: '18:00'
+      end: '19:30'
+  how_to_verify: コース予約の開始時刻を記録する
+  value: *id_csw_opt
+course_ratio_month_effect:
+  unit: logit
+  status: ASSUMPTION
+  justification: 仮置き。月による違いは無いものを base に置く
+  range:
+    low:
+    - -0.5
+    - -0.5
+    - -0.5
+    - -0.5
+    - -0.5
+    - -0.5
+    - -0.5
+    - -0.5
+    - -0.5
+    - -0.5
+    - -0.5
+    - -0.5
+    base: &id_crm_opt
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    high:
+    - 0.5
+    - 0.5
+    - 0.5
+    - 0.5
+    - 0.5
+    - 0.5
+    - 0.5
+    - 0.5
+    - 0.5
+    - 0.5
+    - 0.5
+    - 0.5
+  how_to_verify: 月別のコース比率を集計する
+  value: *id_crm_opt
+course_ratio_weekday_effect:
+  unit: logit
+  status: ASSUMPTION
+  justification: 仮置き。曜日による違いは無いものを base に置く
+  range:
+    low:
+      mon: -0.5
+      tue: -0.5
+      wed: -0.5
+      thu: -0.5
+      fri: -0.5
+      sat: -0.5
+      sun: -0.5
+    base: &id_crw_opt
+      mon: 0.0
+      tue: 0.0
+      wed: 0.0
+      thu: 0.0
+      fri: 0.0
+      sat: 0.0
+      sun: 0.0
+    high:
+      mon: 0.5
+      tue: 0.5
+      wed: 0.5
+      thu: 0.5
+      fri: 0.5
+      sat: 0.5
+      sun: 0.5
+  how_to_verify: 曜日別のコース比率を集計する
+  value: *id_crw_opt
+course_extension_rate:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 仮置き。延長できる日に 2.5 時間へ延ばす組の割合。金曜・祝前日は使わない
+  range:
+    low: 0.0
+    base: 0.3
+    high: 0.6
+  how_to_verify: コース延長の利用組数を数える
+  value: 0.0
