@@ -109,12 +109,11 @@ def test_tc_f1_04_candidate_choice_sets_floor2_override(client: TestClient) -> N
     run_id = _run_id_from_location(res.headers["location"])
     run_payload = client.get(f"/api/runs/{run_id}").json()
     assert (
-        run_payload.get("meta", {}).get("overrides", {}).get("layout.floor2")
-        == "f2_12"
+        run_payload.get("meta", {}).get("overrides", {}).get("layout.floor2") == "f2_12"
     )
     floor2_tables = [
         t
-        for t in run_payload.get("simulation", {}).get("tables", [])
+        for t in run_payload["variants"][0].get("simulation", {}).get("tables", [])
         if t.get("floor") == "2f"
     ]
     assert len(floor2_tables) == 4
@@ -171,7 +170,7 @@ def test_tc_f1_07_default_pages_show_latest_default_run(client: TestClient) -> N
         json=_run_payload(replications=1),
     )
     assert std_res.status_code == 200
-    std_total = std_res.json()["revenue"]["total_inc_tax"]
+    std_total = std_res.json()["variants"][0]["revenue"]["total_inc_tax"]
 
     sim_res = client.post(
         "/stores/birdman_tamachi/simulator",
@@ -187,7 +186,7 @@ def test_tc_f1_07_default_pages_show_latest_default_run(client: TestClient) -> N
     sim_run_id = _run_id_from_location(sim_res.headers["location"])
     over_res = client.get(f"/api/runs/{sim_run_id}")
     assert over_res.status_code == 200
-    over_total = over_res.json()["revenue"]["total_inc_tax"]
+    over_total = over_res.json()["variants"][0]["revenue"]["total_inc_tax"]
 
     # 2つの値が同じにならないこと（上書きで売上が変わること）を先に assert
     assert std_total != over_total
@@ -228,7 +227,7 @@ def test_tc_f1_08_run_param_shows_specified_run_and_unsaved_banner(
     sim_run_id = _run_id_from_location(sim_res.headers["location"])
     over_res = client.get(f"/api/runs/{sim_run_id}")
     assert over_res.status_code == 200
-    over_total = over_res.json()["revenue"]["total_inc_tax"]
+    over_total = over_res.json()["variants"][0]["revenue"]["total_inc_tax"]
 
     page = client.get(f"/stores/birdman_tamachi/revenue?run={sim_run_id}")
     assert page.status_code == 200
@@ -478,7 +477,7 @@ def test_tc_f1_16_revenue_tax_switch_preserves_run_parameter(
     assert res.status_code == 303
     run_id = _run_id_from_location(res.headers["location"])
     run_payload = client.get(f"/api/runs/{run_id}").json()
-    total_ex = run_payload["revenue"]["total_ex_tax"]
+    total_ex = run_payload["variants"][0]["revenue"]["total_ex_tax"]
 
     # 税込画面を開く
     page_inc = client.get(f"/stores/birdman_tamachi/revenue?run={run_id}")
@@ -490,5 +489,3 @@ def test_tc_f1_16_revenue_tax_switch_preserves_run_parameter(
     assert page_ex.status_code == 200
     assert "未保存の試算" in page_ex.text
     assert f"{total_ex:,}" in page_ex.text
-
-

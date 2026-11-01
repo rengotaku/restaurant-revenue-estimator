@@ -3,6 +3,7 @@
 {% block title %}{{ summary.name }} - 店舗収益評価{% endblock %}
 
 {% block content %}
+{% include "stores/_variant_nav.html" %}
 <h1 class="text-2xl font-bold text-gray-800 mb-6">{{ summary.name }}</h1>
 
 <div class="grid gap-6 md:grid-cols-2">
@@ -26,18 +27,59 @@
     </section>
 
     <section class="bg-white rounded-lg shadow p-6">
-        <h2 class="font-bold text-gray-800 mb-3">評価の要約</h2>
+        <h2 class="font-bold text-gray-800 mb-3">評価の要約（{{ result.name or result.variant }}）</h2>
         <dl class="text-sm space-y-1">
             <div class="flex justify-between"><dt class="text-gray-500">年間税込売上</dt><dd>{{ "{:,}".format(result.revenue.total_inc_tax) }} 円</dd></div>
             <div class="flex justify-between"><dt class="text-gray-500">年間税抜売上</dt><dd>{{ "{:,}".format(result.revenue.total_ex_tax) }} 円</dd></div>
             <div class="flex justify-between"><dt class="text-gray-500">事業所得相当</dt><dd>{{ "{:,}".format(result.pnl.business_income) }} 円</dd></div>
             <div class="flex justify-between"><dt class="text-gray-500">店主の労働対価（別列）</dt><dd>{{ "{:,}".format(result.pnl.owner_labor) }} 円</dd></div>
             <div class="flex justify-between"><dt class="text-gray-500">営業日</dt><dd>{{ result.open_days }} 日</dd></div>
-            <div class="flex justify-between"><dt class="text-gray-500">2 階の候補</dt><dd>{{ result.variant }}</dd></div>
+            <div class="flex justify-between"><dt class="text-gray-500">候補名</dt><dd>{{ result.name or result.variant }}</dd></div>
         </dl>
         <p class="mt-4 text-xs text-gray-500">run #{{ run.id }} / seed {{ run.seed }} / replications {{ run.replications }}</p>
     </section>
 </div>
+
+{% if variants %}
+<section class="bg-white rounded-lg shadow p-6 mt-6">
+    <h2 class="font-bold text-gray-800 mb-3">全候補（variant）の評価一覧</h2>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-500">
+                <tr>
+                    <th class="px-4 py-2 text-left">候補名（variant）</th>
+                    <th class="px-4 py-2 text-left">選択内容（choices）</th>
+                    <th class="px-4 py-2 text-right">年間税込売上</th>
+                    <th class="px-4 py-2 text-right">事業所得相当</th>
+                    <th class="px-4 py-2 text-center">操作</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for v in variants %}
+                {% set run_param = ('run=' ~ request.query_params.get('run') ~ '&') if request.query_params.get('run') else '' %}
+                <tr class="{% if v.name == (result.name or result.variant) %}bg-blue-50 font-medium{% endif %}">
+                    <td class="px-4 py-2">{{ v.name }}</td>
+                    <td class="px-4 py-2 text-xs text-gray-600">
+                        {% if v.choices %}
+                        {% for k, val in v.choices.items() %}
+                        <span>{{ k }}: {{ val }}</span>{% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                        {% else %}
+                        —
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-2 text-right">{{ "{:,}".format(v.revenue.total_inc_tax) }} 円</td>
+                    <td class="px-4 py-2 text-right">{{ "{:,}".format(v.pnl.business_income) }} 円</td>
+                    <td class="px-4 py-2 text-center">
+                        <a href="?{{ run_param }}variant={{ v.name }}" class="text-blue-700 hover:underline text-xs">表示</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
 
 <section class="bg-white rounded-lg shadow p-6 mt-6">
     <h2 class="font-bold text-gray-800 mb-3">入力のステータス別件数</h2>

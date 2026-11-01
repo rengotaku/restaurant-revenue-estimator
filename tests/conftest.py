@@ -19,6 +19,7 @@ _session_cached_evaluate = CachedEvaluate()
 PATCH_TARGETS: tuple[str, ...] = (
     "restaurant_revenue_estimator.cli.evaluate",
     "restaurant_revenue_estimator.engine.scenario.scenario.evaluate",
+    "restaurant_revenue_estimator.services.evaluation.evaluate",
     "restaurant_revenue_estimator.services.evaluation_service.evaluate",
     "restaurant_revenue_estimator.services.reporting.evaluate",
 )

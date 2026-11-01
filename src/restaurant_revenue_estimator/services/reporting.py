@@ -5,17 +5,23 @@ from pathlib import Path
 from restaurant_revenue_estimator.engine.scenario import sensitivity
 from restaurant_revenue_estimator.inputs import load_store
 from restaurant_revenue_estimator.inputs.legacy import check_legacy, format_legacy_check
-from restaurant_revenue_estimator.report import load_benchmark, render_markdown
+from restaurant_revenue_estimator.report import (
+    load_benchmark,
+    render_markdown,
+    render_run_markdown,
+)
 from restaurant_revenue_estimator.services.evaluation import (
     EvaluationRequest,
     EvaluationResult,
-    evaluate,
+    RunDocument,
+    evaluate,  # noqa: F401
+    evaluate_run,
 )
 
 
 def build_report_markdown(
     data_dir: Path,
-    result: EvaluationResult,
+    document: RunDocument | EvaluationResult,
     request: EvaluationRequest,
 ) -> str:
     store_dir = data_dir / "stores" / request.store_id
@@ -30,8 +36,16 @@ def build_report_markdown(
         if (store_dir / "legacy" / "v5.yaml").exists()
         else None
     )
+    if isinstance(document, RunDocument):
+        return render_run_markdown(
+            document,
+            inputs,
+            sensitivity_rows=rows,
+            legacy_lines=legacy_lines,
+            benchmark=benchmark,
+        )
     return render_markdown(
-        result,
+        document,
         inputs,
         sensitivity_rows=rows,
         legacy_lines=legacy_lines,
@@ -42,6 +56,6 @@ def build_report_markdown(
 def run_and_report(
     data_dir: Path,
     request: EvaluationRequest,
-) -> tuple[EvaluationResult, str]:
-    result = evaluate(data_dir, request)[0]
-    return result, build_report_markdown(data_dir, result, request)
+) -> tuple[RunDocument, str]:
+    document = evaluate_run(data_dir, request)
+    return document, build_report_markdown(data_dir, document, request)

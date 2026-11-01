@@ -3,15 +3,48 @@
 {% block title %}売上内訳 - {{ store_id }}{% endblock %}
 
 {% block content %}
+{% include "stores/_variant_nav.html" %}
 <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-    <h1 class="text-2xl font-bold text-gray-800">売上内訳</h1>
+    <h1 class="text-2xl font-bold text-gray-800">売上内訳（{{ result.name }}）</h1>
     <div class="flex gap-2 text-sm">
+        {% set variant_param = ('&variant=' ~ request.query_params.get('variant')) if request.query_params.get('variant') else '' %}
         <a class="px-3 py-1 rounded border {% if tax == 'inc' %}bg-blue-600 text-white border-blue-600{% else %}bg-white{% endif %}"
-           href="/stores/{{ store_id }}/revenue?{% if run_id %}run={{ run_id }}&{% endif %}tax=inc">税込</a>
+           href="/stores/{{ store_id }}/revenue?{% if run_id %}run={{ run_id }}&{% endif %}tax=inc{{ variant_param }}">税込</a>
         <a class="px-3 py-1 rounded border {% if tax == 'ex' %}bg-blue-600 text-white border-blue-600{% else %}bg-white{% endif %}"
-           href="/stores/{{ store_id }}/revenue?{% if run_id %}run={{ run_id }}&{% endif %}tax=ex">税抜</a>
+           href="/stores/{{ store_id }}/revenue?{% if run_id %}run={{ run_id }}&{% endif %}tax=ex{{ variant_param }}">税抜</a>
     </div>
 </div>
+
+{% if variant_scenarios %}
+<section class="bg-white rounded-lg shadow p-4 mb-6">
+    <h2 class="font-bold text-gray-800 mb-3">3 シナリオ評価（{{ result.name }}）</h2>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-500">
+                <tr>
+                    <th class="px-4 py-2 text-left">シナリオ</th>
+                    <th class="px-4 py-2 text-right">年間税込売上</th>
+                    <th class="px-4 py-2 text-right">年間税抜売上</th>
+                    <th class="px-4 py-2 text-right">事業所得相当</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for sc in variant_scenarios %}
+                <tr>
+                    <td class="px-4 py-2 font-medium">{{ sc.display_name }}</td>
+                    <td class="px-4 py-2 text-right">{{ "{:,}".format(sc.gross_inc_tax) }} 円</td>
+                    <td class="px-4 py-2 text-right">{{ "{:,}".format(sc.gross_ex_tax) }} 円</td>
+                    <td class="px-4 py-2 text-right">{{ "{:,}".format(sc.business_income) }} 円</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="text-xs text-gray-500 mt-2">
+        同じ乱数・同じ条件で仮定セット（悲観・標準・楽観）を評価したシナリオ比較。予測区間ではない。
+    </p>
+</section>
+{% endif %}
 
 <div class="bg-white rounded-lg shadow p-4 mb-6">
     <canvas id="revenue-chart" height="110"></canvas>

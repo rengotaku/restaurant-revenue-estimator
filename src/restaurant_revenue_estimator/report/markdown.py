@@ -9,7 +9,11 @@ from restaurant_revenue_estimator.engine.pnl import jfc_comparison
 from restaurant_revenue_estimator.engine.scenario import SensitivityRow
 from restaurant_revenue_estimator.evidence.models import ProvenancedValue
 from restaurant_revenue_estimator.inputs import StoreInputs
-from restaurant_revenue_estimator.services.evaluation import EvaluationResult, plain
+from restaurant_revenue_estimator.services.evaluation import (
+    EvaluationResult,
+    RunDocument,
+    plain,
+)
 
 TEN = 1.1
 
@@ -165,52 +169,61 @@ def _related_note(inputs: StoreInputs) -> str:
     return f"姉妹店（{'、'.join(names)}）を含めていない。"
 
 
-def render_markdown(  # noqa: PLR0915
-    result: EvaluationResult,
-    inputs: StoreInputs,
-    *,
-    sensitivity_rows: list[SensitivityRow] | None = None,
-    legacy_lines: list[str] | None = None,
-    benchmark: dict[str, Any] | None = None,
+def _sales_status(
+    choices: dict[str, str],
+    overrides: dict[str, Any] | None,
 ) -> str:
-    store = inputs.files.get("store.yaml", {}) or {}
-    name = plain(store.get("name")) or result.store_id
-    oldest, newest = _source_dates(inputs)
-    lines: list[str] = []
+    """UNRESOLVED の候補を選んで計算した variant は UNRESOLVED、上書きで固定した値は ASSUMPTION."""
+    overrides = overrides or {}
+    if any(key not in overrides for key in choices):
+        return "UNRESOLVED"
+    return "ASSUMPTION"
 
-    lines.append(f"# {name} の評価レポート")
-    lines.append("")
-    lines.append(
-        "> これはシナリオであって実績でも予測区間でもない。実績データで誤差を測るまでは、出力を予測として扱わない。"
-    )
-    lines.append("")
-    lines.append("## 1. 未確定の入力")
-    lines.append("")
-    unresolved = [
-        entry for entry in inputs.values if entry.value.status.value == "UNRESOLVED"
+
+SCENARIO_DISPLAY_NAMES = {
+    "pessimistic": "悲観",
+    "standard": "標準",
+    "optimistic": "楽観",
+}
+
+
+def _render_scenarios_table(document: RunDocument) -> list[str]:
+    lines = [
+        "| 候補 | シナリオ | 年間税込売上 | 年間税抜売上 | 事業所得相当 |",
+        "|---|---|---:|---:|---:|",
     ]
-    if unresolved:
-        for entry in unresolved:
-            note = f"（{entry.value.note}）" if entry.value.note else ""
-            lines.append(
-                f"- `{entry.path}`: 候補 {', '.join(entry.value.candidates)}{note}"
-            )
-    else:
-        lines.append("- なし")
+    by_variant_scenario = {
+        (s["variant"], s["assumption_set"]): s for s in document.scenarios
+    }
+    for var in document.variants:
+        var_name = var["name"]
+        for sc_key in ("pessimistic", "standard", "optimistic"):
+            sc = by_variant_scenario.get((var_name, sc_key))
+            if sc:
+                sc_name = SCENARIO_DISPLAY_NAMES.get(sc_key, sc_key)
+                lines.append(
+                    f"| {var_name} | {sc_name} | {_yen(sc['gross_inc_tax'])} | "
+                    f"{_yen(sc['gross_ex_tax'])} | {_yen(sc['business_income'])} |"
+                )
     lines.append("")
+    return lines
 
-    lines.append("## 2. 店舗と根拠の時点")
-    lines.append("")
-    lines.append(f"- 店舗: {name}")
-    lines.append(f"- 住所: {plain(store.get('address'))}")
-    lines.append(f"- 出典の取得日: {oldest} 〜 {newest}")
-    lines.append(f"- {_related_note(inputs)}")
-    lines.append("")
 
-    lines.append("## 3. 年間・月別の売上")
-    lines.append("")
-    lines.append("| 月 | 昼（税込） | 夜（税込） | 合計（税込） | 税抜 |")
-    lines.append("|---|---:|---:|---:|---:|")
+def _render_variant_revenue(
+    result: EvaluationResult,
+    overrides: dict[str, Any] | None,
+    *,
+    with_subheading: bool = True,
+) -> list[str]:
+    lines: list[str] = []
+    if with_subheading:
+        lines.extend([f"### {result.variant}", ""])
+    lines.extend(
+        [
+            "| 月 | 昼（税込） | 夜（税込） | 合計（税込） | 税抜 |",
+            "|---|---:|---:|---:|---:|",
+        ]
+    )
     for month in result.revenue.months:
         lines.append(
             f"| {month.month} 月 | {_yen(month.lunch_inc_tax)} | {_yen(month.dinner_inc_tax)} | "
@@ -221,17 +234,28 @@ def render_markdown(  # noqa: PLR0915
         f"{_yen(result.revenue.total_inc_tax)} | {_yen(result.revenue.total_ex_tax)} |"
     )
     lines.append("")
-    lines.append("ステータス: 売上は DERIVED（元入力のうち最も弱いのは ASSUMPTION）。")
+    status = _sales_status(result.choices, overrides)
+    lines.append(f"ステータス: 売上は DERIVED（元入力のうち最も弱いのは {status}）。")
     lines.append("")
     lines.append(f"- アラカルト: {_yen(result.revenue.ala_inc_tax)}")
     lines.append(f"- コース: {_yen(result.revenue.course_inc_tax)}")
     lines.append("")
+    return lines
 
-    lines.append("## 4. 卓シミュレーション")
-    lines.append("")
-    lines.append(f"- 営業日: {result.open_days} 日")
-    lines.append(
-        f"- 卓: {len(result.tables)} 卓 / {sum(table.seats for table in result.tables)} 席"
+
+def _render_variant_tables(
+    result: EvaluationResult,
+    *,
+    with_subheading: bool = True,
+) -> list[str]:
+    lines: list[str] = []
+    if with_subheading:
+        lines.extend([f"### {result.variant}", ""])
+    lines.extend(
+        [
+            f"- 営業日: {result.open_days} 日",
+            f"- 卓: {len(result.tables)} 卓 / {sum(table.seats for table in result.tables)} 席",
+        ]
     )
     lunch_text = ", ".join(
         f"{weekday} {guests} 人"
@@ -253,28 +277,43 @@ def render_markdown(  # noqa: PLR0915
         lines.append(f"- 夜の失った需要: {result.dinner_lost_guests:,} 人/年")
     lines.append(f"- 2 階の候補: {result.variant}")
     lines.append("")
+    return lines
 
-    lines.append("## 5. 費用・損益・CF")
-    lines.append("")
+
+def _render_variant_pnl(
+    result: EvaluationResult,
+    *,
+    with_subheading: bool = True,
+) -> list[str]:
+    lines: list[str] = []
+    if with_subheading:
+        lines.extend([f"### {result.variant}", ""])
     pnl = result.pnl
-    lines.append("| 段階 | 金額 |")
-    lines.append("|---|---:|")
-    lines.append(f"| 税込売上 | {_yen(pnl.gross_inc_tax)} |")
-    lines.append(f"| 税抜売上 | {_yen(pnl.gross_ex_tax)} |")
-    lines.append(f"| 粗利 | {_yen(pnl.yen(pnl.gross_profit))} |")
-    lines.append(f"| 店舗営業利益 | {_yen(pnl.yen(pnl.store_operating_profit))} |")
-    lines.append(f"| 事業所得相当 | {_yen(pnl.yen(pnl.business_income))} |")
-    lines.append(f"| CF | {_yen(pnl.yen(pnl.cash_flow))} |")
-    lines.append(f"| 店主の労働対価（別列） | {_yen(pnl.yen(pnl.owner_labor))} |")
-    lines.append("")
-    lines.append(
-        "店主の労働対価は事業所得相当に含めていない。両者を足した値は出さない。"
+    lines.extend(
+        [
+            "| 段階 | 金額 |",
+            "|---|---:|",
+            f"| 税込売上 | {_yen(pnl.gross_inc_tax)} |",
+            f"| 税抜売上 | {_yen(pnl.gross_ex_tax)} |",
+            f"| 粗利 | {_yen(pnl.yen(pnl.gross_profit))} |",
+            f"| 店舗営業利益 | {_yen(pnl.yen(pnl.store_operating_profit))} |",
+            f"| 事業所得相当 | {_yen(pnl.yen(pnl.business_income))} |",
+            f"| CF | {_yen(pnl.yen(pnl.cash_flow))} |",
+            f"| 店主の労働対価（別列） | {_yen(pnl.yen(pnl.owner_labor))} |",
+            "",
+            "店主の労働対価は事業所得相当に含めていない。両者を足した値は出さない。",
+            "",
+        ]
     )
-    lines.append("")
+    return lines
 
-    lines.append("## 6. 公庫ベンチマークとの照合")
-    lines.append("")
-    if benchmark:
+
+def _render_benchmark_section(
+    pnl: Any,
+    benchmark: dict[str, Any] | None,
+) -> list[str]:
+    lines = ["## 6. 公庫ベンチマークとの照合", ""]
+    if benchmark and pnl:
         definition = benchmark.get("definition_note", "")
         lines.append(f"- 定義: {definition}")
         lines.append("- 売上は税込、人件費に店主の労働対価を含めて換算した。")
@@ -297,9 +336,13 @@ def render_markdown(  # noqa: PLR0915
     else:
         lines.append("- ベンチマークが無い。")
     lines.append("")
+    return lines
 
-    lines.append("## 7. 感度と調査の優先順位")
-    lines.append("")
+
+def _render_sensitivity_section(
+    sensitivity_rows: list[SensitivityRow] | None,
+) -> list[str]:
+    lines = ["## 7. 感度と調査の優先順位", ""]
     if sensitivity_rows:
         lines.append(
             "| 入力 | 振った値 | 年間税込売上の差 | 事業所得相当の差 | 確かめ方 |"
@@ -312,11 +355,181 @@ def render_markdown(  # noqa: PLR0915
     else:
         lines.append("- 感度分析を実行していない。")
     lines.append("")
+    return lines
 
-    lines.append("## 8. 根拠一覧")
+
+def render_markdown(
+    result: EvaluationResult,
+    inputs: StoreInputs,
+    *,
+    sensitivity_rows: list[SensitivityRow] | None = None,
+    legacy_lines: list[str] | None = None,
+    benchmark: dict[str, Any] | None = None,
+) -> str:
+    store = inputs.files.get("store.yaml", {}) or {}
+    name = plain(store.get("name")) or result.store_id
+    oldest, newest = _source_dates(inputs)
+    lines: list[str] = [
+        f"# {name} の評価レポート",
+        "",
+        "> これはシナリオであって実績でも予測区間でもない。実績データで誤差を測るまでは、出力を予測として扱わない。",
+        "",
+        "## 1. 未確定の入力",
+        "",
+    ]
+
+    unresolved = [
+        entry for entry in inputs.values if entry.value.status.value == "UNRESOLVED"
+    ]
+    if unresolved:
+        for entry in unresolved:
+            note = f"（{entry.value.note}）" if entry.value.note else ""
+            lines.append(
+                f"- `{entry.path}`: 候補 {', '.join(entry.value.candidates)}{note}"
+            )
+    else:
+        lines.append("- なし")
     lines.append("")
-    lines.append("| キー | ステータス | 値 | 出典 | 注記 |")
-    lines.append("|---|---|---|---|---|")
+
+    lines.extend(
+        [
+            "## 2. 店舗と根拠の時点",
+            "",
+            f"- 店舗: {name}",
+            f"- 住所: {plain(store.get('address'))}",
+            f"- 出典の取得日: {oldest} 〜 {newest}",
+            f"- {_related_note(inputs)}",
+            "",
+            "## 3. 年間・月別の売上",
+            "",
+        ]
+    )
+    lines.extend(
+        _render_variant_revenue(result, result.meta.overrides, with_subheading=False)
+    )
+
+    lines.extend(
+        [
+            "## 4. 卓シミュレーション",
+            "",
+        ]
+    )
+    lines.extend(_render_variant_tables(result, with_subheading=False))
+
+    lines.extend(
+        [
+            "## 5. 費用・損益・CF",
+            "",
+        ]
+    )
+    lines.extend(_render_variant_pnl(result, with_subheading=False))
+
+    lines.extend(_render_benchmark_section(result.pnl, benchmark))
+    lines.extend(_render_sensitivity_section(sensitivity_rows))
+
+    lines.extend(
+        [
+            "## 8. 根拠一覧",
+            "",
+            "| キー | ステータス | 値 | 出典 | 注記 |",
+            "|---|---|---|---|---|",
+        ]
+    )
+    lines.extend(_value_lines(inputs))
+    lines.append("")
+
+    if legacy_lines:
+        lines.append("## 付録: 過去の試算との差")
+        lines.append("")
+        lines.extend(f"- {line}" for line in legacy_lines)
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def render_run_markdown(
+    document: RunDocument,
+    inputs: StoreInputs,
+    *,
+    sensitivity_rows: list[SensitivityRow] | None = None,
+    legacy_lines: list[str] | None = None,
+    benchmark: dict[str, Any] | None = None,
+) -> str:
+    store = inputs.files.get("store.yaml", {}) or {}
+    name = plain(store.get("name")) or document.store_id
+    oldest, newest = _source_dates(inputs)
+    lines: list[str] = [
+        f"# {name} の評価レポート",
+        "",
+        "> これはシナリオであって実績でも予測区間でもない。実績データで誤差を測るまでは、出力を予測として扱わない。",
+        "",
+        "## 1. 未確定の入力",
+        "",
+    ]
+
+    unresolved = [
+        entry for entry in inputs.values if entry.value.status.value == "UNRESOLVED"
+    ]
+    if unresolved:
+        for entry in unresolved:
+            note = f"（{entry.value.note}）" if entry.value.note else ""
+            lines.append(
+                f"- `{entry.path}`: 候補 {', '.join(entry.value.candidates)}{note}"
+            )
+        lines.append(f"- 候補の組合せ {len(document.variants)} 通りをすべて計算した。")
+    else:
+        lines.append("- なし")
+    lines.append("")
+
+    lines.extend(
+        [
+            "## 2. 店舗と根拠の時点",
+            "",
+            f"- 店舗: {name}",
+            f"- 住所: {plain(store.get('address'))}",
+            f"- 出典の取得日: {oldest} 〜 {newest}",
+            f"- {_related_note(inputs)}",
+            "",
+            "## 3. 年間・月別の売上",
+            "",
+        ]
+    )
+    lines.extend(_render_scenarios_table(document))
+    for res in document.results:
+        lines.extend(
+            _render_variant_revenue(res, document.meta.overrides, with_subheading=True)
+        )
+
+    lines.extend(
+        [
+            "## 4. 卓シミュレーション",
+            "",
+        ]
+    )
+    for res in document.results:
+        lines.extend(_render_variant_tables(res, with_subheading=True))
+
+    lines.extend(
+        [
+            "## 5. 費用・損益・CF",
+            "",
+        ]
+    )
+    for res in document.results:
+        lines.extend(_render_variant_pnl(res, with_subheading=True))
+
+    first_pnl = document.results[0].pnl if document.results else None
+    lines.extend(_render_benchmark_section(first_pnl, benchmark))
+    lines.extend(_render_sensitivity_section(sensitivity_rows))
+
+    lines.extend(
+        [
+            "## 8. 根拠一覧",
+            "",
+            "| キー | ステータス | 値 | 出典 | 注記 |",
+            "|---|---|---|---|---|",
+        ]
+    )
     lines.extend(_value_lines(inputs))
     lines.append("")
 

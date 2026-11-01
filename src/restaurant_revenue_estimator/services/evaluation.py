@@ -4,7 +4,7 @@ import hashlib
 import math
 import re
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
@@ -68,6 +68,7 @@ class EvaluationRequest:
     replications: int = 20
     overrides: dict[str, Any] | None = None
     saturday_closure: str | None = None
+    saturday_hours_candidate: str | None = None
 
 
 @dataclass(frozen=True)
@@ -112,6 +113,7 @@ class EvaluationResult:
     seasonality_targets: dict[str, str] = field(default_factory=dict)
     labor_breakdown: LaborBreakdown | None = None
     warnings: tuple[str, ...] = ()
+    choices: dict[str, str] = field(default_factory=dict)
 
     @property
     def gross_inc_tax(self) -> int:
@@ -259,7 +261,8 @@ def _calendar(
     year: int,
     mode: str,
     data_dir: Path,
-    saturday_closure: str | None,
+    saturday_closure: str | None = None,
+    saturday_hours_candidate: str | None = None,
 ) -> list[CalendarSeries]:
     holidays = load_holidays(
         data_dir / "calendars" / "jp_holidays_cao.csv",
@@ -274,6 +277,7 @@ def _calendar(
         mode=mode,
         holidays=holidays,
         saturday_closure_start=saturday_closure,
+        saturday_hours_candidate=saturday_hours_candidate,
     )
     return series
 
@@ -285,6 +289,83 @@ def _hours_minutes(hours: ServiceHours, base: str) -> tuple[int, int]:
     start = open_hour * 60 + open_minute - (base_hour * 60 + base_minute)
     end = close_hour * 60 + close_minute - (base_hour * 60 + base_minute)
     return start, end
+
+
+def _resolve_calendar_candidates(
+    inputs: StoreInputs,
+    request: EvaluationRequest,
+    overrides: dict[str, Any],
+) -> tuple[list[str | None], list[str | None]]:
+    if request.calendar_mode == "steady":
+        return [None], [None]
+
+    closure_candidates: list[str | None]
+    if request.saturday_closure is not None:
+        closure_candidates = [request.saturday_closure]
+    elif "saturday_closure_start" in overrides:
+        closure_candidates = [str(overrides["saturday_closure_start"])]
+    else:
+        operations = inputs.files.get("operations.yaml", {}) or {}
+        raw_closure = operations.get("saturday_closure_start") or {}
+        if (
+            isinstance(raw_closure, dict)
+            and raw_closure.get("status") == SourceStatus.UNRESOLVED.value
+            and raw_closure.get("candidates")
+        ):
+            closure_candidates = list(raw_closure["candidates"].keys())
+        else:
+            closure_candidates = [None]
+
+    hours_candidates: list[str | None]
+    if request.saturday_hours_candidate is not None:
+        hours_candidates = [request.saturday_hours_candidate]
+    elif "saturday_hours_before_closure" in overrides:
+        hours_candidates = [str(overrides["saturday_hours_before_closure"])]
+    else:
+        operations = inputs.files.get("operations.yaml", {}) or {}
+        raw_hours = operations.get("saturday_hours_before_closure") or {}
+        if (
+            isinstance(raw_hours, dict)
+            and raw_hours.get("status") == SourceStatus.UNRESOLVED.value
+            and raw_hours.get("candidates")
+        ):
+            hours_candidates = list(raw_hours["candidates"].keys())
+        else:
+            hours_candidates = [None]
+
+    return closure_candidates, hours_candidates
+
+
+def _build_calendars_map(
+    inputs: StoreInputs,
+    request: EvaluationRequest,
+    data_dir: Path,
+    closure_candidates: list[str | None],
+    hours_candidates: list[str | None],
+) -> dict[tuple[str | None, str | None], CalendarSeries]:
+    calendars_map: dict[tuple[str | None, str | None], CalendarSeries] = {}
+    for closure_cand in closure_candidates:
+        for hours_cand in hours_candidates:
+            if request.calendar_mode == "steady":
+                cals = _calendar(
+                    inputs,
+                    year=request.year,
+                    mode="steady",
+                    data_dir=data_dir,
+                    saturday_closure=None,
+                    saturday_hours_candidate=None,
+                )
+            else:
+                cals = _calendar(
+                    inputs,
+                    year=request.year,
+                    mode=request.calendar_mode,
+                    data_dir=data_dir,
+                    saturday_closure=closure_cand,
+                    saturday_hours_candidate=hours_cand,
+                )
+            calendars_map[(closure_cand, hours_cand)] = cals[0]
+    return calendars_map
 
 
 def evaluate(
@@ -314,23 +395,6 @@ def evaluate(
         plain((menu.get("appetizer") or {}).get("waived_for_course", True))
     )
 
-    calendars = _calendar(
-        inputs,
-        year=request.year,
-        mode=request.calendar_mode,
-        data_dir=data_dir,
-        saturday_closure=request.saturday_closure,
-    )
-    calendar = calendars[0]
-    if request.calendar_mode == "steady":
-        calendar = _calendar(
-            inputs,
-            year=request.year,
-            mode=request.calendar_mode,
-            data_dir=data_dir,
-            saturday_closure=None,
-        )[0]
-
     floors, fixed, variants = _floors(inputs)
     if isinstance(floor_choice, list):
         custom = [
@@ -340,24 +404,52 @@ def evaluate(
     elif floor_choice and floor_choice != "default":
         variants = [item for item in variants if item[0] == floor_choice] or variants
 
+    closure_candidates, hours_candidates = _resolve_calendar_candidates(
+        inputs, request, overrides
+    )
+    calendars_map = _build_calendars_map(
+        inputs, request, data_dir, closure_candidates, hours_candidates
+    )
+
     results: list[EvaluationResult] = []
-    for variant_name, tables in variants:
-        results.append(
-            _evaluate_variant(
-                inputs=inputs,
-                request=request,
-                assumptions=assumptions,
-                course_specs=course_specs,
-                appetizer_price=appetizer_price,
-                appetizer_waived=appetizer_waived,
-                calendar=calendar,
-                floors=floors,
-                tables=tables,
-                variant=variant_name,
-                overrides=overrides,
-                data_dir=data_dir,
-            )
-        )
+    for floor_name, tables in variants:
+        for closure_cand in closure_candidates:
+            for hours_cand in hours_candidates:
+                calendar = calendars_map[(closure_cand, hours_cand)]
+                if request.calendar_mode == "steady":
+                    variant_name = floor_name
+                    choices: dict[str, str] = {"layout.floor2": floor_name}
+                else:
+                    name_parts = [floor_name]
+                    if closure_cand is not None:
+                        name_parts.append(str(closure_cand))
+                    if hours_cand is not None:
+                        name_parts.append(str(hours_cand))
+                    variant_name = "/".join(name_parts)
+
+                    choices = {"layout.floor2": floor_name}
+                    if closure_cand is not None:
+                        choices["saturday_closure_start"] = str(closure_cand)
+                    if hours_cand is not None:
+                        choices["saturday_hours_before_closure"] = str(hours_cand)
+
+                results.append(
+                    _evaluate_variant(
+                        inputs=inputs,
+                        request=request,
+                        assumptions=assumptions,
+                        course_specs=course_specs,
+                        appetizer_price=appetizer_price,
+                        appetizer_waived=appetizer_waived,
+                        calendar=calendar,
+                        floors=floors,
+                        tables=tables,
+                        variant=variant_name,
+                        overrides=overrides,
+                        data_dir=data_dir,
+                        choices=choices,
+                    )
+                )
     return results
 
 
@@ -754,6 +846,7 @@ def _evaluate_variant(
     variant: str,
     overrides: dict[str, Any],
     data_dir: Path,
+    choices: dict[str, str] | None = None,
 ) -> EvaluationResult:
     values = {key: _assumption_value(raw) for key, raw in assumptions.items()}
 
@@ -869,4 +962,97 @@ def _evaluate_variant(
         seasonality_targets=seasonality_targets,
         labor_breakdown=annual_breakdown,
         warnings=warnings,
+        choices=dict(choices or {}),
+    )
+
+
+@dataclass(frozen=True)
+class RunDocument:
+    store_id: str
+    year: int
+    calendar_mode: str
+    assumption_set: str
+    meta: EvaluationMeta
+    overrides: dict[str, Any]
+    unresolved: tuple[str, ...]
+    variants: list[dict[str, Any]]
+    scenarios: list[dict[str, Any]]
+    results: list[EvaluationResult] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "store_id": self.store_id,
+            "year": self.year,
+            "calendar_mode": self.calendar_mode,
+            "assumption_set": self.assumption_set,
+            "meta": self.meta.as_dict() if hasattr(self.meta, "as_dict") else self.meta,
+            "overrides": [
+                {
+                    "key": key,
+                    "status": "ASSUMPTION",
+                    "source": f"scenario:{key}",
+                }
+                for key in self.meta.overrides
+            ],
+            "unresolved": list(self.unresolved),
+            "variants": self.variants,
+            "scenarios": self.scenarios,
+        }
+
+
+def evaluate_run(
+    data_dir: Path,
+    request: EvaluationRequest,
+) -> RunDocument:
+    """悲観・標準・楽観を同じ seed・replications・年・暦・上書きで回し、
+    全 variant と scenarios をまとめる.
+    """
+    scenarios = ("pessimistic", "standard", "optimistic")
+    all_scenario_results: dict[str, list[EvaluationResult]] = {}
+
+    for aset in scenarios:
+        req = replace(request, assumption_set=aset)
+        all_scenario_results[aset] = evaluate(data_dir, req)
+
+    base_results = all_scenario_results[request.assumption_set]
+    if not base_results:
+        raise EvaluationError("評価結果が空です")
+
+    from restaurant_revenue_estimator.report.markdown import (  # noqa: PLC0415
+        result_to_dict,
+    )
+
+    variants_dicts: list[dict[str, Any]] = []
+    for res in base_results:
+        v_dict = {
+            "name": res.variant,
+            "choices": dict(res.choices),
+            **result_to_dict(res),
+        }
+        variants_dicts.append(v_dict)
+
+    scenarios_list: list[dict[str, Any]] = []
+    for aset in scenarios:
+        for res in all_scenario_results[aset]:
+            scenarios_list.append(
+                {
+                    "assumption_set": aset,
+                    "variant": res.variant,
+                    "gross_inc_tax": res.gross_inc_tax,
+                    "gross_ex_tax": res.gross_ex_tax,
+                    "business_income": res.pnl.yen(res.pnl.business_income),
+                }
+            )
+
+    return RunDocument(
+        store_id=request.store_id,
+        year=request.year,
+        calendar_mode=request.calendar_mode,
+        assumption_set=request.assumption_set,
+        meta=base_results[0].meta,
+        overrides=dict(request.overrides or {}),
+        unresolved=base_results[0].unresolved,
+        variants=variants_dicts,
+        scenarios=scenarios_list,
+        results=base_results,
     )
