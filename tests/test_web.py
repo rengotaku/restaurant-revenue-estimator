@@ -239,11 +239,26 @@ def test_costs_page_warns_below_minimum_wage_and_shows_owner_separately(
         json={
             "name": "時給1250",
             "overrides": {
-                "part_time_staff": {
-                    "heads_per_day": 2,
-                    "hours_per_day": 5,
-                    "hourly_wage": 1250,
-                }
+                "part_time_shifts": [
+                    {
+                        "id": "lunch",
+                        "weekdays": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+                        "service": "lunch",
+                        "start": "11:00",
+                        "end": "14:00",
+                        "heads": 2,
+                        "hourly_wage": 1250,
+                    },
+                    {
+                        "id": "dinner",
+                        "weekdays": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+                        "service": "dinner",
+                        "start": "17:00",
+                        "end": "23:00",
+                        "heads": 3,
+                        "hourly_wage": 1250,
+                    },
+                ]
             },
         },
     ).json()

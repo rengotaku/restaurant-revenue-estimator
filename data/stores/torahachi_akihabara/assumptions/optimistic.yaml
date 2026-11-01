@@ -255,45 +255,124 @@ owner_virtual_wage:
 full_time_staff:
   unit: staff
   status: ASSUMPTION
-  justification: spec 2.2 の標準シナリオ（正社員 5 人・月給 35 万円）
+  justification: spec 2.2 の標準シナリオ（在籍人数ではない）
   range:
-    low:
+    low: &id005
     - role: 正社員
-      count: 5
-      monthly_salary: 330000
+      count: 4
+      monthly_salary: 350000
     base:
     - role: 正社員
       count: 5
       monthly_salary: 350000
-    high: &id005
+    high:
     - role: 正社員
       count: 6
-      monthly_salary: 370000
-  value:
-  - role: 正社員
-    count: 5
-    monthly_salary: 330000
-part_time_staff:
-  unit: staff
+      monthly_salary: 350000
+  how_to_verify: 在籍人数と給与を店に確認する
+  value: *id005
+part_time_shifts:
+  unit: shifts
   status: ASSUMPTION
-  justification: spec 2.2 の標準シナリオ（延べ 8 人/日・5 時間・時給 1,330 円）。在籍人数ではない
+  justification: spec 2.2 の標準シナリオ（在籍人数ではない）
   range:
-    low:
-      heads_per_day: 6
-      hours_per_day: 4
-      hourly_wage: 1330
+    low: &id006
+    - id: early
+      weekdays: [mon, tue, wed, thu, fri, sat, sun]
+      service: dinner
+      start: '16:00'
+      end: '21:00'
+      heads: 3
+      hourly_wage: 1280
+    - id: late
+      weekdays: [mon, tue, wed, thu, fri, sat, sun]
+      service: dinner
+      start: '18:20'
+      end: '23:20'
+      heads: 3
+      hourly_wage: 1280
     base:
-      heads_per_day: 8
-      hours_per_day: 5
+    - id: early
+      weekdays: [mon, tue, wed, thu, fri, sat, sun]
+      service: dinner
+      start: '16:00'
+      end: '21:00'
+      heads: 4
       hourly_wage: 1330
-    high: &id006
-      heads_per_day: 10
-      hours_per_day: 6
+    - id: late
+      weekdays: [mon, tue, wed, thu, fri, sat, sun]
+      service: dinner
+      start: '18:20'
+      end: '23:20'
+      heads: 4
+      hourly_wage: 1330
+    high:
+    - id: early
+      weekdays: [mon, tue, wed, thu, fri, sat, sun]
+      service: dinner
+      start: '16:00'
+      end: '21:00'
+      heads: 5
       hourly_wage: 1400
-  value:
-    heads_per_day: 6
-    hours_per_day: 4
-    hourly_wage: 1330
+    - id: late
+      weekdays: [mon, tue, wed, thu, fri, sat, sun]
+      service: dinner
+      start: '18:20'
+      end: '23:20'
+      heads: 5
+      hourly_wage: 1400
+  how_to_verify: シフト表で人数と時間を確認する
+  value: *id006
+late_night_premium:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 労働基準法の深夜割増 25% 以上
+  range:
+    low: 1.25
+    base: 1.25
+    high: 1.25
+  how_to_verify: 就業規則や給与規定を確認する
+  value: 1.25
+statutory_benefit_rate:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 公開情報に無い。仮置き
+  range:
+    low: 0.13
+    base: 0.15
+    high: 0.17
+  how_to_verify: 決算書の法定福利費比率を確認する
+  value: 0.13
+bonus_months_per_year:
+  unit: months
+  status: ASSUMPTION
+  justification: 公開情報に無い。仮置き
+  range:
+    low: 0
+    base: 0
+    high: 1
+  how_to_verify: 就業規則や求人票の賞与実績を確認する
+  value: 0
+commuting_monthly_per_full_time:
+  unit: yen/month
+  status: ASSUMPTION
+  justification: 公開情報に無い。仮置き
+  range:
+    low: 0
+    base: 10000
+    high: 20000
+  how_to_verify: 従業員の通勤経路と定期代を確認する
+  value: 0
+commuting_per_part_time_shift:
+  unit: yen/shift
+  status: ASSUMPTION
+  justification: 公開情報に無い。仮置き
+  range:
+    low: 0
+    base: 500
+    high: 1000
+  how_to_verify: 交通費支給規定や求人票を確認する
+  value: 0
 independence_cost_monthly:
   unit: yen/month
   status: ASSUMPTION

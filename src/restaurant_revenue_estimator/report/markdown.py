@@ -74,7 +74,41 @@ def result_to_dict(result: EvaluationResult) -> dict[str, Any]:
             "interest": pnl.yen(pnl.fixed.interest),
             "principal": pnl.yen(pnl.fixed.principal),
             "capex": pnl.yen(pnl.fixed.capex),
+            "months": [
+                {
+                    "year": m.year,
+                    "month": m.month,
+                    "gross_inc_tax": m.gross_inc_tax,
+                    "gross_ex_tax": m.gross_ex_tax,
+                    "cogs": m.yen(m.cogs),
+                    "gross_profit": m.yen(m.gross_profit),
+                    "labor": m.yen(m.labor),
+                    "store_operating_profit": m.yen(m.store_operating_profit),
+                    "business_income": m.yen(m.business_income),
+                    "owner_labor": m.yen(m.owner_labor),
+                    "cash_flow": m.yen(m.cash_flow),
+                    "rent": m.yen(m.fixed.rent),
+                    "other_expenses": m.yen(m.fixed.other_total),
+                    "depreciation": m.yen(m.fixed.depreciation),
+                    "interest": m.yen(m.fixed.interest),
+                    "principal": m.yen(m.fixed.principal),
+                    "capex": m.yen(m.fixed.capex),
+                }
+                for m in getattr(pnl, "months", ())
+            ],
         },
+        "labor_breakdown": (
+            {
+                "full_time": pnl.yen(result.labor_breakdown.full_time),
+                "bonus": pnl.yen(result.labor_breakdown.bonus),
+                "part_time": pnl.yen(result.labor_breakdown.part_time),
+                "statutory": pnl.yen(result.labor_breakdown.statutory),
+                "commute": pnl.yen(result.labor_breakdown.commute),
+            }
+            if result.labor_breakdown is not None
+            else {}
+        ),
+        "warnings": list(result.warnings),
         "meta": result.meta.as_dict(),
         "unresolved": list(result.unresolved),
         "overrides": [

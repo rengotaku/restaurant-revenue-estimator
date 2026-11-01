@@ -20,13 +20,15 @@ from restaurant_revenue_estimator.engine.calendar import (
 )
 from restaurant_revenue_estimator.engine.cost import (
     FixedCosts,
-    PartTimeShift,
+    LaborBreakdown,
+    ShiftSpec,
     StaffRole,
+    cost_of_goods,
     full_time_cost,
+    labor_warnings,
     owner_labor,
-    part_time_cost,
+    part_time_wages,
     statutory_cost,
-    variable_costs,
 )
 from restaurant_revenue_estimator.engine.dinner import (
     CourseSpec,
@@ -34,10 +36,11 @@ from restaurant_revenue_estimator.engine.dinner import (
     simulate_dinner_day,
 )
 from restaurant_revenue_estimator.engine.lunch import simulate_lunch_day
-from restaurant_revenue_estimator.engine.pnl import PnL, build_pnl
+from restaurant_revenue_estimator.engine.pnl import MonthlyPnL, PnL, build_monthly_pnl
 from restaurant_revenue_estimator.engine.revenue import (
     CourseSales,
     DaySales,
+    MonthRevenue,
     RevenueResult,
     SeasonalityRegistry,
     ServiceSales,
@@ -95,7 +98,7 @@ class EvaluationResult:
     calendar_mode: str
     assumption_set: str
     revenue: RevenueResult
-    pnl: PnL
+    pnl: MonthlyPnL
     open_days: int
     lunch_guests_by_weekday: dict[str, int]
     dinner_guests: int
@@ -107,6 +110,8 @@ class EvaluationResult:
     dinner_lost_guests: int = 0
     dinner_lost_by_reason: dict[str, int] = field(default_factory=dict)
     seasonality_targets: dict[str, str] = field(default_factory=dict)
+    labor_breakdown: LaborBreakdown | None = None
+    warnings: tuple[str, ...] = ()
 
     @property
     def gross_inc_tax(self) -> int:
@@ -379,9 +384,7 @@ def _validate_dinner_assumptions(
     end_str = str(csw["end"])
 
     time_pattern = r"^([01]\d|2[0-3]):[0-5]\d$"
-    if not re.match(time_pattern, start_str) or not re.match(
-        time_pattern, end_str
-    ):
+    if not re.match(time_pattern, start_str) or not re.match(time_pattern, end_str):
         raise EvaluationError("course_start_window は HH:MM 形式")
 
     if start_str > end_str:
@@ -596,6 +599,147 @@ def _evaluate_dinner(  # noqa: PLR0915
     )
 
 
+def _compute_pnl_and_labor(
+    *,
+    year: int,
+    revenue: RevenueResult,
+    calendar: CalendarSeries,
+    values: dict[str, Any],
+) -> tuple[MonthlyPnL, LaborBreakdown, tuple[str, ...]]:
+    full_time_roles = [
+        StaffRole(str(item["role"]), int(item["count"]), int(item["monthly_salary"]))
+        for item in values.get("full_time_staff", [])
+    ]
+    shift_specs = [
+        ShiftSpec(
+            id=str(item["id"]),
+            weekdays=tuple(item["weekdays"]),
+            service=str(item["service"]),
+            start=str(item["start"]),
+            end=str(item["end"]),
+            heads=int(item["heads"]),
+            hourly_wage=Decimal(str(item["hourly_wage"])),
+        )
+        for item in values.get("part_time_shifts", [])
+    ]
+    late_premium = Decimal(str(values.get("late_night_premium", "1.25")))
+    statutory_rate = Decimal(str(values["statutory_benefit_rate"]))
+    bonus_months = Decimal(str(values.get("bonus_months_per_year", 0)))
+    commute_full_time = Decimal(str(values.get("commuting_monthly_per_full_time", 0)))
+    commute_part_time = Decimal(str(values.get("commuting_per_part_time_shift", 0)))
+
+    warnings = tuple(labor_warnings(shift_specs, calendar.days))
+
+    rev_by_month = {m.month: m for m in revenue.months}
+    cost_rate_ala = Decimal(str(values["cost_rate_ala"]))
+    cost_rate_course = Decimal(str(values["cost_rate_course"]))
+    owner_hours_monthly = Decimal(str(values["owner_hours_monthly"]))
+    owner_virtual_wage = Decimal(str(values["owner_virtual_wage"]))
+    owner_m = owner_labor(owner_hours_monthly, owner_virtual_wage)
+
+    other_raw = values["other_expenses_monthly"]
+    monthly_fixed = FixedCosts(
+        rent=Decimal(str(values["rent_monthly"])),
+        other={key: Decimal(str(value)) for key, value in other_raw.items()},
+        independence=Decimal(str(values["independence_cost_monthly"])),
+        depreciation=Decimal(str(values["depreciation_monthly"])),
+        interest=Decimal(str(values["loan_interest_monthly"])),
+        principal=Decimal(str(values["loan_principal_monthly"])),
+        capex=Decimal(str(values["capex_monthly"])),
+    )
+
+    ft_monthly = full_time_cost(full_time_roles)
+    total_ft_heads = sum(r.count for r in full_time_roles)
+    commute_ft_m = Decimal(total_ft_heads) * commute_full_time
+    bonus_m = (ft_monthly * bonus_months) / Decimal(12)
+
+    monthly_pnls: list[PnL] = []
+    monthly_ft: list[Decimal] = []
+    monthly_bonus: list[Decimal] = []
+    monthly_pt: list[Decimal] = []
+    monthly_commute: list[Decimal] = []
+    monthly_statutory: list[Decimal] = []
+
+    for month_num in range(1, 13):
+        month_days = [d for d in calendar.days if d.day.month == month_num]
+        month_rev = rev_by_month.get(
+            month_num,
+            MonthRevenue(
+                year=year,
+                month=month_num,
+                lunch_inc_tax=0,
+                dinner_inc_tax=0,
+                ala_inc_tax=0,
+                course_inc_tax=0,
+                appetizer_inc_tax=0,
+                other_inc_tax=0,
+                tax_10_inc=0,
+                tax_8_inc=0,
+            ),
+        )
+        pt_wages = part_time_wages(shift_specs, month_days, late_premium=late_premium)
+        commute_pt_m = sum(
+            (
+                Decimal(s.heads)
+                * commute_part_time
+                * Decimal(pt_wages.counts_by_shift.get(s.id, 0))
+                for s in shift_specs
+            ),
+            Decimal(0),
+        )
+        total_commute_m = commute_ft_m + commute_pt_m
+
+        ft_m_yen = Decimal(round(ft_monthly))
+        bonus_m_yen = Decimal(round(bonus_m))
+        pt_m_yen = Decimal(round(pt_wages.total))
+        commute_m_yen = Decimal(round(total_commute_m))
+
+        statutory_base_m = ft_m_yen + bonus_m_yen + pt_m_yen
+        statutory_m = statutory_cost(statutory_base_m, flat_rate=statutory_rate)
+        statutory_m_yen = Decimal(round(statutory_m))
+
+        labor_m_yen = (
+            ft_m_yen + bonus_m_yen + pt_m_yen + statutory_m_yen + commute_m_yen
+        )
+
+        cogs_int = cost_of_goods(
+            month_rev,
+            cost_rate_ala=cost_rate_ala,
+            cost_rate_course=cost_rate_course,
+        )
+        owner_m_yen = Decimal(round(owner_m))
+
+        monthly_pnls.append(
+            PnL(
+                gross_inc_tax=month_rev.total_inc_tax,
+                gross_ex_tax=month_rev.total_ex_tax,
+                cogs=Decimal(cogs_int),
+                labor=labor_m_yen,
+                owner_labor=owner_m_yen,
+                fixed=monthly_fixed,
+                sales_tax=0,
+                year=year,
+                month=month_num,
+            )
+        )
+        monthly_ft.append(ft_m_yen)
+        monthly_bonus.append(bonus_m_yen)
+        monthly_pt.append(pt_m_yen)
+        monthly_commute.append(commute_m_yen)
+        monthly_statutory.append(statutory_m_yen)
+
+    pnl = build_monthly_pnl(monthly_pnls)
+
+    annual_breakdown = LaborBreakdown(
+        full_time=sum(monthly_ft, Decimal(0)),
+        bonus=sum(monthly_bonus, Decimal(0)),
+        part_time=sum(monthly_pt, Decimal(0)),
+        statutory=sum(monthly_statutory, Decimal(0)),
+        commute=sum(monthly_commute, Decimal(0)),
+    )
+    return pnl, annual_breakdown, warnings
+
+
 def _evaluate_variant(
     *,
     inputs: StoreInputs,
@@ -682,55 +826,11 @@ def _evaluate_variant(
 
     revenue = aggregate(days)
 
-    open_count = max(1, len(calendar.open_days))
-    full_time_roles = [
-        StaffRole(str(item["role"]), int(item["count"]), int(item["monthly_salary"]))
-        for item in values["full_time_staff"]
-    ]
-    part_time = values["part_time_staff"]
-    shifts = [
-        PartTimeShift(
-            heads=int(part_time["heads_per_day"]),
-            hours_per_day=Decimal(str(part_time["hours_per_day"])),
-            hourly_wage=Decimal(str(part_time["hourly_wage"])),
-            late_hours_per_day=Decimal(str(part_time.get("late_hours_per_day", 0))),
-        )
-    ]
-    full_time_annual = full_time_cost(full_time_roles) * 12
-    part_time_annual = part_time_cost(shifts, days=open_count)
-    labor_annual = full_time_annual + part_time_annual
-    benefits = statutory_cost(labor_annual, flat_rate=Decimal("0.15"))
-    owner = (
-        owner_labor(
-            Decimal(str(values["owner_hours_monthly"])),
-            Decimal(str(values["owner_virtual_wage"])),
-        )
-        * 12
-    )
-
-    other_raw = values["other_expenses_monthly"]
-    fixed = FixedCosts(
-        rent=Decimal(str(values["rent_monthly"])) * 12,
-        other={key: Decimal(str(value)) * 12 for key, value in other_raw.items()},
-        independence=Decimal(str(values["independence_cost_monthly"])) * 12,
-        depreciation=Decimal(str(values["depreciation_monthly"])) * 12,
-        interest=Decimal(str(values["loan_interest_monthly"])) * 12,
-        principal=Decimal(str(values["loan_principal_monthly"])) * 12,
-        capex=Decimal(str(values["capex_monthly"])) * 12,
-    )
-    variable = variable_costs(
-        ala_revenue=revenue.ala_inc_tax,
-        course_revenue=revenue.course_inc_tax,
-        cost_rate_ala=Decimal(str(values["cost_rate_ala"])),
-        cost_rate_course=Decimal(str(values["cost_rate_course"])),
-    )
-    pnl = build_pnl(
-        gross_inc_tax=revenue.total_inc_tax,
-        gross_ex_tax=revenue.total_ex_tax,
-        variable=variable,
-        labor=labor_annual + benefits,
-        owner=owner,
-        fixed=fixed,
+    pnl, annual_breakdown, warnings = _compute_pnl_and_labor(
+        year=request.year,
+        revenue=revenue,
+        calendar=calendar,
+        values=values,
     )
 
     csv_path = data_dir / "calendars" / "jp_holidays_cao.csv"
@@ -767,4 +867,6 @@ def _evaluate_variant(
         dinner_lost_guests=dinner_lost_guests,
         dinner_lost_by_reason=dinner_lost_by_reason,
         seasonality_targets=seasonality_targets,
+        labor_breakdown=annual_breakdown,
+        warnings=warnings,
     )

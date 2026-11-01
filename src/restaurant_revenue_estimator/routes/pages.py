@@ -500,12 +500,8 @@ async def submit_simulator(
                 floor2_two=raw_2p,
                 banner=None,
             )
-        tables = [
-            {"id": f"2f-4-{index}", "seats": 4}
-            for index in range(count_4p)
-        ] + [
-            {"id": f"2f-2-{index}", "seats": 2}
-            for index in range(count_2p)
+        tables = [{"id": f"2f-4-{index}", "seats": 4} for index in range(count_4p)] + [
+            {"id": f"2f-2-{index}", "seats": 2} for index in range(count_2p)
         ]
         overrides["layout.floor2"] = tables
     elif floor2_choice != "":
@@ -551,9 +547,7 @@ async def submit_simulator(
     redirect_url = f"/stores/{store_id}/simulator?run={run.id}"
     if name:
         redirect_url += "&saved=1"
-    return RedirectResponse(
-        url=redirect_url, status_code=303
-    )
+    return RedirectResponse(url=redirect_url, status_code=303)
 
 
 @router.get("/stores/{store_id}/costs", response_class=HTMLResponse)
@@ -567,17 +561,7 @@ def store_costs(
     selected_run, banner = _resolve_run(session, store_id, run)
     result = _run_result(selected_run)
     assumptions = inputs.files.get("assumptions/standard.yaml", {}) or {}
-    part_time = assumptions.get("part_time_staff", {})
-    runtime_overrides = result.get("meta", {}).get("overrides", {}) or {}
-    part_time_value = (
-        runtime_overrides.get("part_time_staff") or part_time.get("value") or {}
-    )
-    wage = float(part_time_value.get("hourly_wage", 0))
-    warnings = []
-    if wage and wage < 1280:
-        warnings.append(
-            f"時給 {wage:.0f} 円が東京都最低賃金 1,280 円（2026-10-01〜）を下回る"
-        )
+    warnings = list(result.get("warnings") or [])
     pnl = result["pnl"]
     denominator = pnl["gross_inc_tax"] or 1
     jfc = {

@@ -9,6 +9,7 @@ from restaurant_revenue_estimator.inputs.loader import (
     load_store,
     validate_all,
     validate_identity,
+    validate_shift_specs,
     validate_store,
 )
 
@@ -21,5 +22,6 @@ __all__ = [
     "load_store",
     "validate_all",
     "validate_identity",
+    "validate_shift_specs",
     "validate_store",
 ]

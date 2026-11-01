@@ -8,7 +8,11 @@ from pydantic import BaseModel, Field
 from sqlmodel import Session
 
 from restaurant_revenue_estimator import code_version
-from restaurant_revenue_estimator.inputs import input_hash, load_store
+from restaurant_revenue_estimator.inputs import (
+    input_hash,
+    load_store,
+    validate_shift_specs,
+)
 from restaurant_revenue_estimator.models import Run, Scenario
 from restaurant_revenue_estimator.report import result_to_dict
 from restaurant_revenue_estimator.repositories.scenario_repo import (
@@ -38,6 +42,25 @@ class OverrideError(Exception):
     """上書きできないキー."""
 
 
+def _validate_floor2_override(layout: dict[str, Any], choice: Any) -> None:
+    if isinstance(choice, str):
+        candidates: set[str] = set()
+        for floor in layout.get("floors", []) or []:
+            tables = floor.get("tables")
+            if isinstance(tables, dict):
+                candidates.update(tables.get("candidates") or {})
+        if choice not in candidates:
+            raise OverrideError(
+                f"上書きできないキー: layout.floor2（候補 {sorted(candidates)}）"
+            )
+    elif isinstance(choice, list):
+        for item in choice:
+            if not isinstance(item, dict) or "id" not in item or "seats" not in item:
+                raise OverrideError("layout.floor2 は {id, seats} の配列で指定する")
+    else:
+        raise OverrideError("layout.floor2 は候補名か卓の配列で指定する")
+
+
 def _validate_overrides(data_dir: Path, store_id: str, req: RunRequest) -> None:
     inputs = load_store(data_dir / "stores" / store_id)
     assumptions = inputs.files.get(f"assumptions/{req.assumption_set}.yaml")
@@ -51,29 +74,17 @@ def _validate_overrides(data_dir: Path, store_id: str, req: RunRequest) -> None:
     except EvaluationError as exc:
         raise OverrideError(str(exc)) from exc
 
+    if "part_time_shifts" in req.overrides:
+        shifts = req.overrides["part_time_shifts"]
+        shift_errors = validate_shift_specs(shifts)
+        if shift_errors:
+            raise OverrideError(
+                f"part_time_shifts の指定が不正: {'; '.join(shift_errors)}"
+            )
+
     if "layout.floor2" in req.overrides:
-        choice = req.overrides["layout.floor2"]
-        if isinstance(choice, str):
-            layout = inputs.files.get("layout.yaml", {}) or {}
-            candidates: set[str] = set()
-            for floor in layout.get("floors", []) or []:
-                tables = floor.get("tables")
-                if isinstance(tables, dict):
-                    candidates.update(tables.get("candidates") or {})
-            if choice not in candidates:
-                raise OverrideError(
-                    f"上書きできないキー: layout.floor2（候補 {sorted(candidates)}）"
-                )
-        elif isinstance(choice, list):
-            for item in choice:
-                if (
-                    not isinstance(item, dict)
-                    or "id" not in item
-                    or "seats" not in item
-                ):
-                    raise OverrideError("layout.floor2 は {id, seats} の配列で指定する")
-        else:
-            raise OverrideError("layout.floor2 は候補名か卓の配列で指定する")
+        layout = inputs.files.get("layout.yaml", {}) or {}
+        _validate_floor2_override(layout, req.overrides["layout.floor2"])
 
 
 def execute_run(
