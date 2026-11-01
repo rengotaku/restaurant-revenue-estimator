@@ -10,6 +10,7 @@ from restaurant_revenue_estimator.engine.revenue.revenue import (
     SeasonalityRegistry,
     ServiceSales,
     aggregate,
+    allocate_ex_tax,
     price_at,
     realized_course_price,
 )
@@ -24,6 +25,7 @@ __all__ = [
     "SeasonalityRegistry",
     "ServiceSales",
     "aggregate",
+    "allocate_ex_tax",
     "price_at",
     "realized_course_price",
 ]

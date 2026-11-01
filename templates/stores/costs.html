@@ -10,37 +10,220 @@
 <p class="mb-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">{{ warning }}</p>
 {% endfor %}
 
-<div class="grid gap-6 md:grid-cols-2">
-    <section class="bg-white rounded-lg shadow p-4">
-        <h2 class="font-bold text-gray-800 mb-2">月次の損益段階</h2>
+<section class="bg-white rounded-lg shadow p-4 mb-6">
+    <h2 class="font-bold text-gray-800 mb-2">月次の損益段階</h2>
+    <div class="overflow-x-auto">
         <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-500">
+                <tr>
+                    <th class="px-3 py-2 text-left">月</th>
+                    <th class="px-3 py-2 text-right">税込売上</th>
+                    <th class="px-3 py-2 text-right">税抜売上</th>
+                    <th class="px-3 py-2 text-right">原価</th>
+                    <th class="px-3 py-2 text-right">粗利</th>
+                    <th class="px-3 py-2 text-right">人件費</th>
+                    <th class="px-3 py-2 text-right">店舗営業利益</th>
+                    <th class="px-3 py-2 text-right">事業所得相当</th>
+                    <th class="px-3 py-2 text-right">CF</th>
+                    <th class="px-3 py-2 text-right">店主の労働対価（別列）</th>
+                </tr>
+            </thead>
             <tbody class="divide-y divide-gray-100">
-                <tr><td class="py-2 text-gray-500">税込売上</td><td class="py-2 text-right">{{ "{:,}".format(pnl.gross_inc_tax) }}</td></tr>
-                <tr><td class="py-2 text-gray-500">税抜売上</td><td class="py-2 text-right">{{ "{:,}".format(pnl.gross_ex_tax) }}</td></tr>
-                <tr><td class="py-2 text-gray-500">粗利</td><td class="py-2 text-right">{{ "{:,}".format(pnl.gross_profit) }}</td></tr>
-                <tr><td class="py-2 text-gray-500">店舗営業利益</td><td class="py-2 text-right">{{ "{:,}".format(pnl.store_operating_profit) }}</td></tr>
-                <tr><td class="py-2 text-gray-500">事業所得相当</td><td class="py-2 text-right font-medium">{{ "{:,}".format(pnl.business_income) }}</td></tr>
-                <tr><td class="py-2 text-gray-500">CF</td><td class="py-2 text-right">{{ "{:,}".format(pnl.cash_flow) }}</td></tr>
-                <tr><td class="py-2 text-gray-500">店主の労働対価（別列）</td><td class="py-2 text-right">{{ "{:,}".format(pnl.owner_labor) }}</td></tr>
+                {% for m in pnl.months %}
+                <tr>
+                    <td class="px-3 py-2">{{ m.month }} 月</td>
+                    <td class="px-3 py-2 text-right">{{ "{:,}".format(m.gross_inc_tax) }}</td>
+                    <td class="px-3 py-2 text-right">{{ "{:,}".format(m.gross_ex_tax) }}</td>
+                    <td class="px-3 py-2 text-right">{{ "{:,}".format(m.cogs) }}</td>
+                    <td class="px-3 py-2 text-right">{{ "{:,}".format(m.gross_profit) }}</td>
+                    <td class="px-3 py-2 text-right">{{ "{:,}".format(m.labor) }}</td>
+                    <td class="px-3 py-2 text-right">{{ "{:,}".format(m.store_operating_profit) }}</td>
+                    <td class="px-3 py-2 text-right font-medium">{{ "{:,}".format(m.business_income) }}</td>
+                    <td class="px-3 py-2 text-right">{{ "{:,}".format(m.cash_flow) }}</td>
+                    <td class="px-3 py-2 text-right">{{ "{:,}".format(m.owner_labor) }}</td>
+                </tr>
+                {% endfor %}
             </tbody>
+            <tfoot class="bg-gray-50 font-bold">
+                <tr>
+                    <td class="px-3 py-2">年</td>
+                    <td class="px-3 py-2 text-right">{{ "{:,}".format(pnl.gross_inc_tax) }}</td>
+                    <td class="px-3 py-2 text-right">{{ "{:,}".format(pnl.gross_ex_tax) }}</td>
+                    <td class="px-3 py-2 text-right">{{ "{:,}".format(pnl.cogs) }}</td>
+                    <td class="px-3 py-2 text-right">{{ "{:,}".format(pnl.gross_profit) }}</td>
+                    <td class="px-3 py-2 text-right">{{ "{:,}".format(pnl.labor) }}</td>
+                    <td class="px-3 py-2 text-right">{{ "{:,}".format(pnl.store_operating_profit) }}</td>
+                    <td class="px-3 py-2 text-right font-medium">{{ "{:,}".format(pnl.business_income) }}</td>
+                    <td class="px-3 py-2 text-right">{{ "{:,}".format(pnl.cash_flow) }}</td>
+                    <td class="px-3 py-2 text-right">{{ "{:,}".format(pnl.owner_labor) }}</td>
+                </tr>
+            </tfoot>
         </table>
-        <p class="text-xs text-gray-500 mt-2">店主の労働対価は事業所得相当に含めない。両者を足した列は作らない。</p>
+    </div>
+    <p class="text-xs text-gray-500 mt-2">円。店主の労働対価は事業所得相当に含めない。両者を足した列は作らない。</p>
+</section>
+
+<section class="bg-white rounded-lg shadow p-4 mb-6">
+    <h2 class="font-bold text-gray-800 mb-3">人件費の内訳</h2>
+    <div class="grid gap-6 md:grid-cols-2 mb-4">
+        <div>
+            <h3 class="font-semibold text-gray-700 text-sm mb-2">職種別の人数と月給（正社員）</h3>
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-gray-500">
+                    <tr>
+                        <th class="px-3 py-2 text-left">職種</th>
+                        <th class="px-3 py-2 text-right">人数</th>
+                        <th class="px-3 py-2 text-right">月給</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% if full_time_staff %}
+                        {% for staff in full_time_staff %}
+                        <tr>
+                            <td class="px-3 py-2">{{ staff.role }}</td>
+                            <td class="px-3 py-2 text-right">{{ staff.count }} 人</td>
+                            <td class="px-3 py-2 text-right">{{ "{:,}".format(staff.monthly_salary) }} 円</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="3" class="px-3 py-2 text-gray-500">未記録</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        <div>
+            <h3 class="font-semibold text-gray-700 text-sm mb-2">割増率・手当など</h3>
+            <dl class="text-sm space-y-1">
+                <div class="flex justify-between py-1 border-b border-gray-100">
+                    <dt class="text-gray-500">深夜割増率（22:00〜5:00）</dt>
+                    <dd class="font-medium">{% if late_night_premium is not none and late_night_premium != '' %}{{ (late_night_premium * 100) | round(1) }}%（25% 割増）{% else %}未記録{% endif %}</dd>
+                </div>
+                <div class="flex justify-between py-1 border-b border-gray-100">
+                    <dt class="text-gray-500">法定福利費率</dt>
+                    <dd class="font-medium">{% if statutory_benefit_rate is not none and statutory_benefit_rate != '' %}{{ (statutory_benefit_rate * 100) | round(1) }}%{% else %}未記録{% endif %}</dd>
+                </div>
+                <div class="flex justify-between py-1 border-b border-gray-100">
+                    <dt class="text-gray-500">賞与月数</dt>
+                    <dd class="font-medium">{% if bonus_months is not none and bonus_months != '' %}{{ bonus_months }} ヶ月/年{% else %}未記録{% endif %}</dd>
+                </div>
+                <div class="flex justify-between py-1 border-b border-gray-100">
+                    <dt class="text-gray-500">通勤費（正社員）</dt>
+                    <dd class="font-medium">{% if commuting_full_time is not none and commuting_full_time != '' %}{{ "{:,}".format(commuting_full_time) }} 円/月{% else %}未記録{% endif %}</dd>
+                </div>
+                <div class="flex justify-between py-1 border-b border-gray-100">
+                    <dt class="text-gray-500">通勤費（アルバイト）</dt>
+                    <dd class="font-medium">{% if commuting_part_time is not none and commuting_part_time != '' %}{{ "{:,}".format(commuting_part_time) }} 円/シフト{% else %}未記録{% endif %}</dd>
+                </div>
+            </dl>
+        </div>
+    </div>
+
+    <div>
+        <h3 class="font-semibold text-gray-700 text-sm mb-2">シフト表（アルバイト）</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-gray-500">
+                    <tr>
+                        <th class="px-3 py-2 text-left">シフト名</th>
+                        <th class="px-3 py-2 text-left">区分</th>
+                        <th class="px-3 py-2 text-left">曜日</th>
+                        <th class="px-3 py-2 text-left">時間帯</th>
+                        <th class="px-3 py-2 text-right">人数</th>
+                        <th class="px-3 py-2 text-right">時給</th>
+                        <th class="px-3 py-2 text-right">22 時以降の時間</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% if part_time_shifts %}
+                        {% for shift in part_time_shifts %}
+                        <tr>
+                            <td class="px-3 py-2 font-medium">{{ shift.id }}</td>
+                            <td class="px-3 py-2">{{ shift.service_label }}</td>
+                            <td class="px-3 py-2 text-xs text-gray-600">{{ shift.weekdays | join(', ') }}</td>
+                            <td class="px-3 py-2">{{ shift.start }} 〜 {{ shift.end }}</td>
+                            <td class="px-3 py-2 text-right">{{ shift.heads }} 人</td>
+                            <td class="px-3 py-2 text-right">{{ "{:,}".format(shift.hourly_wage) }} 円</td>
+                            <td class="px-3 py-2 text-right">{{ shift.late_night_text }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="px-3 py-2 text-gray-500">未記録</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        <p class="text-xs text-gray-500 mt-2">アルバイトの時給・人数は仮定ファイルの値。22:00〜5:00 は 25% 以上を割増する。</p>
+    </div>
+</section>
+
+<div class="grid gap-6 md:grid-cols-2 mb-6">
+    <section class="bg-white rounded-lg shadow p-4">
+        <h2 class="font-bold text-gray-800 mb-2">原価率</h2>
+        <dl class="text-sm space-y-1">
+            <div class="flex justify-between py-1 border-b border-gray-100">
+                <dt class="text-gray-500">アラカルト原価率</dt>
+                <dd class="font-medium">{% if cost_rate_ala is not none and cost_rate_ala != '' %}{{ (cost_rate_ala * 100) | round(1) }}%{% else %}未記録{% endif %}</dd>
+            </div>
+            <div class="flex justify-between py-1 border-b border-gray-100">
+                <dt class="text-gray-500">コース原価率</dt>
+                <dd class="font-medium">{% if cost_rate_course is not none and cost_rate_course != '' %}{{ (cost_rate_course * 100) | round(1) }}%{% else %}未記録{% endif %}</dd>
+            </div>
+        </dl>
+        <h2 class="font-bold text-gray-800 mt-4 mb-2">家賃・独立化代替費・減価償却・借入</h2>
+        <dl class="text-sm space-y-1">
+            <div class="flex justify-between py-1 border-b border-gray-100">
+                <dt class="text-gray-500">家賃</dt>
+                <dd class="font-medium">{% if rent_monthly is not none and rent_monthly != '' %}{{ "{:,}".format(rent_monthly) }} 円/月{% else %}未記録{% endif %}</dd>
+            </div>
+            <div class="flex justify-between py-1 border-b border-gray-100">
+                <dt class="text-gray-500">独立化代替費</dt>
+                <dd class="font-medium">{% if independence_cost_monthly is not none and independence_cost_monthly != '' %}{{ "{:,}".format(independence_cost_monthly) }} 円/月（年額 {{ "{:,}".format(independence_cost_annual) }} 円）{% else %}未記録{% endif %}</dd>
+            </div>
+            <div class="flex justify-between py-1 border-b border-gray-100">
+                <dt class="text-gray-500">減価償却</dt>
+                <dd class="font-medium">{% if depreciation_monthly is not none and depreciation_monthly != '' %}{{ "{:,}".format(depreciation_monthly) }} 円/月{% else %}未記録{% endif %}</dd>
+            </div>
+            <div class="flex justify-between py-1 border-b border-gray-100">
+                <dt class="text-gray-500">借入元本返済（CF のみ）</dt>
+                <dd class="font-medium">{% if loan_principal_monthly is not none and loan_principal_monthly != '' %}{{ "{:,}".format(loan_principal_monthly) }} 円/月{% else %}未記録{% endif %}</dd>
+            </div>
+            <div class="flex justify-between py-1 border-b border-gray-100">
+                <dt class="text-gray-500">支払利息</dt>
+                <dd class="font-medium">{% if loan_interest_monthly is not none and loan_interest_monthly != '' %}{{ "{:,}".format(loan_interest_monthly) }} 円/月{% else %}未記録{% endif %}</dd>
+            </div>
+        </dl>
     </section>
 
     <section class="bg-white rounded-lg shadow p-4">
-        <h2 class="font-bold text-gray-800 mb-2">費目</h2>
+        <h2 class="font-bold text-gray-800 mb-2">その他費目の内訳</h2>
         <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-500">
+                <tr>
+                    <th class="px-3 py-2 text-left">費目</th>
+                    <th class="px-3 py-2 text-right">月額</th>
+                </tr>
+            </thead>
             <tbody class="divide-y divide-gray-100">
-                <tr><td class="py-2 text-gray-500">人件費</td><td class="py-2 text-right">{{ "{:,}".format(pnl.labor) }}</td></tr>
-                <tr><td class="py-2 text-gray-500">原価</td><td class="py-2 text-right">{{ "{:,}".format(pnl.cogs) }}</td></tr>
-                <tr><td class="py-2 text-gray-500">家賃</td><td class="py-2 text-right">{{ "{:,}".format(pnl.rent) }}</td></tr>
-                <tr><td class="py-2 text-gray-500">その他販管費</td><td class="py-2 text-right">{{ "{:,}".format(pnl.other_expenses) }}</td></tr>
-                <tr><td class="py-2 text-gray-500">減価償却</td><td class="py-2 text-right">{{ "{:,}".format(pnl.depreciation) }}</td></tr>
-                <tr><td class="py-2 text-gray-500">支払利息</td><td class="py-2 text-right">{{ "{:,}".format(pnl.interest) }}</td></tr>
-                <tr><td class="py-2 text-gray-500">元本返済（CF のみ）</td><td class="py-2 text-right">{{ "{:,}".format(pnl.principal) }}</td></tr>
+                {% if other_expenses_monthly %}
+                    <tr><td class="px-3 py-2 text-gray-500">水道光熱費</td><td class="px-3 py-2 text-right">{{ "{:,}".format(other_expenses_monthly.get('utilities', 0)) }} 円</td></tr>
+                    <tr><td class="px-3 py-2 text-gray-500">カード決済手数料</td><td class="px-3 py-2 text-right">{{ "{:,}".format(other_expenses_monthly.get('card_fee', 0)) }} 円</td></tr>
+                    <tr><td class="px-3 py-2 text-gray-500">消耗品費</td><td class="px-3 py-2 text-right">{{ "{:,}".format(other_expenses_monthly.get('supplies', 0)) }} 円</td></tr>
+                    <tr><td class="px-3 py-2 text-gray-500">広告宣伝費</td><td class="px-3 py-2 text-right">{{ "{:,}".format(other_expenses_monthly.get('advertising', 0)) }} 円</td></tr>
+                    <tr><td class="px-3 py-2 text-gray-500">損害保険料</td><td class="px-3 py-2 text-right">{{ "{:,}".format(other_expenses_monthly.get('insurance', 0)) }} 円</td></tr>
+                    <tr><td class="px-3 py-2 text-gray-500">通信費</td><td class="px-3 py-2 text-right">{{ "{:,}".format(other_expenses_monthly.get('telecom', 0)) }} 円</td></tr>
+                    <tr><td class="px-3 py-2 text-gray-500">会計・顧問料</td><td class="px-3 py-2 text-right">{{ "{:,}".format(other_expenses_monthly.get('accounting', 0)) }} 円</td></tr>
+                {% else %}
+                    <tr>
+                        <td colspan="2" class="px-3 py-2 text-gray-500">未記録</td>
+                    </tr>
+                {% endif %}
             </tbody>
         </table>
-        <p class="text-xs text-gray-500 mt-2">アルバイトの時給・人数は仮定ファイルの値。22:00〜5:00 は 25% 以上を割増する。</p>
+        <p class="text-xs text-gray-500 mt-2">本部機能（経理・採用・予約等）は独立化代替費として計上している。</p>
     </section>
 </div>
 
@@ -50,11 +233,23 @@
         売上は税込、人件費に店主の労働対価を含めて換算した。分母と範囲の定義が違うため、外れていても誤りとは扱わない。
     </p>
     <table class="w-full text-sm">
-        <thead class="bg-gray-50 text-gray-500"><tr><th class="px-3 py-2 text-left">指標</th><th class="px-3 py-2 text-right">推計</th><th class="px-3 py-2 text-right">公庫平均</th></tr></thead>
+        <thead class="bg-gray-50 text-gray-500">
+            <tr>
+                <th class="px-3 py-2 text-left">指標</th>
+                <th class="px-3 py-2 text-right">推計</th>
+                <th class="px-3 py-2 text-right">公庫平均</th>
+                <th class="px-3 py-2 text-right">黒字企業平均</th>
+            </tr>
+        </thead>
         <tbody class="divide-y divide-gray-100">
-            <tr><td class="px-3 py-2">総利益率</td><td class="px-3 py-2 text-right">{{ "%.1f"|format(jfc.gross_profit_ratio * 100) }}%</td><td class="px-3 py-2 text-right">67.8%</td></tr>
-            <tr><td class="px-3 py-2">人件費率</td><td class="px-3 py-2 text-right">{{ "%.1f"|format(jfc.labor_ratio * 100) }}%</td><td class="px-3 py-2 text-right">32.2%</td></tr>
-            <tr><td class="px-3 py-2">営業利益率</td><td class="px-3 py-2 text-right">{{ "%.1f"|format(jfc.operating_margin * 100) }}%</td><td class="px-3 py-2 text-right">-1.8%</td></tr>
+            {% for row in jfc_rows %}
+            <tr>
+                <td class="px-3 py-2">{{ row.label }}</td>
+                <td class="px-3 py-2 text-right">{{ row.estimate }}</td>
+                <td class="px-3 py-2 text-right">{{ row.average }}</td>
+                <td class="px-3 py-2 text-right">{{ row.profitable_average }}</td>
+            </tr>
+            {% endfor %}
         </tbody>
     </table>
 </section>

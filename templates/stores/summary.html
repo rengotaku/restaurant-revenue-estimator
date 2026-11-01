@@ -12,9 +12,42 @@
         <dl class="text-sm space-y-1">
             <div class="flex gap-2"><dt class="w-24 text-gray-500">住所</dt><dd>{{ summary.address }}</dd></div>
             <div class="flex gap-2"><dt class="w-24 text-gray-500">電話</dt><dd>{{ summary.phone }}</dd></div>
+            {% if external_urls %}
+            <div class="flex gap-2">
+                <dt class="w-24 text-gray-500">外部 URL</dt>
+                <dd class="space-y-1">
+                    {% for item in external_urls %}
+                    <div>
+                        <span class="text-gray-500">{{ item.label }}:</span>
+                        <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">
+                            {{ item.url }}
+                        </a>
+                    </div>
+                    {% endfor %}
+                </dd>
+            </div>
+            {% endif %}
             <div class="flex gap-2"><dt class="w-24 text-gray-500">出典の取得日</dt><dd>{{ summary.source_from }} 〜 {{ summary.source_to }}</dd></div>
             <div class="flex gap-2"><dt class="w-24 text-gray-500">営業ルール</dt>
-                <dd>{% for rule in summary.rules %}{{ rule.id }}（{{ rule["from"] }} 〜 {{ rule["to"] }}）{% endfor %}</dd>
+                <dd class="space-y-1">
+                    <div>現行: {% for rule in summary.rules %}{{ rule.id }}（{{ rule["from"] }} 〜 {{ rule["to"] }}）{% endfor %}</div>
+                    {% if saturday_closure_candidates %}
+                    <div class="text-xs text-gray-600">
+                        <span class="font-medium text-gray-700">土曜定休の開始日候補:</span>
+                        {% for date_cand, note in saturday_closure_candidates.items() %}
+                        <span>{{ date_cand }}（{{ note }}）</span>{% if not loop.last %}、{% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% if saturday_hours_candidates %}
+                    <div class="text-xs text-gray-600">
+                        <span class="font-medium text-gray-700">それ以前の土曜営業時間候補:</span>
+                        {% for id_cand, hours in saturday_hours_candidates.items() %}
+                        <span>{{ id_cand }}（{% if hours.lunch %}昼 {{ hours.lunch.open }}〜{{ hours.lunch.close }}{% endif %}{% if hours.lunch and hours.dinner %} / {% endif %}{% if hours.dinner %}夜 {{ hours.dinner.open }}〜{{ hours.dinner.close }}{% endif %}）</span>{% if not loop.last %}、{% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </dd>
             </div>
         </dl>
         <p class="mt-4 text-sm text-gray-600">

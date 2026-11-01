@@ -19,6 +19,7 @@ TARGET_FILES: tuple[str, ...] = (
     "test_simulator_default_run.py",
     "test_eval_cache.py",
     "test_variants.py",
+    "test_screens.py",
 )
 
 EXCLUDED_TESTS: tuple[str, ...] = (

@@ -1,6 +1,7 @@
 """候補（variant）の直積と 3 シナリオ評価のテスト (STEP1a)."""
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -575,3 +576,101 @@ def test_legacy_run_result_compatibility(client: TestClient, session: Session) -
     assert old_inc_tax in res_c.text, (
         f"サマリーに旧形式の total_inc_tax ({old_inc_tax}) が表示されること"
     )
+
+
+def test_legacy_run_layout_compatibility(client: TestClient, session: Session) -> None:
+    """旧形式の result_json（lunch_occupancy_max / avg が無い）でも
+    座席画面が 200 で表示され「未記録」が出ること。
+    物理席数は simulation.tables の和から算出されること。
+    """
+    req = EvaluationRequest(
+        store_id="birdman_tamachi",
+        assumption_set="standard",
+        calendar_mode="steady",
+        year=2026,
+        seed=42,
+        replications=1,
+        overrides={"layout.floor2": "f2_12"},
+    )
+    eval_res = evaluate(DATA, req)[0]
+    legacy_payload = result_to_dict(eval_res)
+    legacy_payload.pop("lunch_occupancy_max", None)
+    legacy_payload.pop("lunch_occupancy_12_13_avg", None)
+    legacy_payload.pop("physical_seats", None)
+    legacy_payload.pop("lunch_weekday_used", None)
+    if "variants" in legacy_payload:
+        for v in legacy_payload["variants"]:
+            v.pop("lunch_occupancy_max", None)
+            v.pop("lunch_occupancy_12_13_avg", None)
+            v.pop("physical_seats", None)
+            v.pop("lunch_weekday_used", None)
+
+    old_run = Run(
+        store_id="birdman_tamachi",
+        scenario_id=None,
+        assumption_set="standard",
+        calendar_mode="steady",
+        year=2026,
+        seed=42,
+        replications=1,
+        input_hash="legacy_input_hash_layout",
+        code_sha256="legacy_sha256",
+        result_json=json.dumps(legacy_payload, ensure_ascii=False),
+    )
+    repo = RunRepository(session)
+    repo.add(old_run)
+    old_id = old_run.id
+    assert old_id is not None
+
+    res = client.get(f"/stores/birdman_tamachi/layout?run={old_id}")
+    assert res.status_code == 200, res.text
+    assert "未記録" in res.text
+    # 物理席数は保存済みの simulation.tables の席数の和（f2_12 は 34 席）
+    expected_seats = sum(t["seats"] for t in legacy_payload["simulation"]["tables"])
+    seats_match = re.search(r"物理席数</dt>\s*<dd[^>]*>\s*(\d+)", res.text)
+    assert seats_match is not None, "物理席数の欄に値があること"
+    assert int(seats_match.group(1)) == expected_seats
+
+
+def test_legacy_run_costs_compatibility(
+    client: TestClient, session: Session
+) -> None:
+    """旧形式の result_json（cost_breakdown が無い）を持つ Run では、
+    費用画面の内訳欄に「未記録」が表示され、YAML からの値は出ないこと.
+    """
+    req = EvaluationRequest(
+        store_id="birdman_tamachi",
+        assumption_set="standard",
+        calendar_mode="steady",
+        year=2026,
+        seed=42,
+        replications=1,
+    )
+    eval_res = evaluate(DATA, req)[0]
+    legacy_payload = result_to_dict(eval_res)
+    legacy_payload.pop("cost_breakdown", None)
+    if "variants" in legacy_payload:
+        for v in legacy_payload["variants"]:
+            v.pop("cost_breakdown", None)
+
+    old_run = Run(
+        store_id="birdman_tamachi",
+        scenario_id=None,
+        assumption_set="standard",
+        calendar_mode="steady",
+        year=2026,
+        seed=42,
+        replications=1,
+        input_hash="legacy_input_hash_costs_unrecorded",
+        code_sha256="legacy_sha256",
+        result_json=json.dumps(legacy_payload, ensure_ascii=False),
+    )
+    repo = RunRepository(session)
+    repo.add(old_run)
+    old_id = old_run.id
+    assert old_id is not None
+
+    res = client.get(f"/stores/birdman_tamachi/costs?run={old_id}")
+    assert res.status_code == 200, res.text
+    assert "未記録" in res.text
+

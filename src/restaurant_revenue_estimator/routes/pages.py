@@ -15,18 +15,32 @@ from restaurant_revenue_estimator.engine.calendar import (
     calendars_for_store,
     load_holidays,
 )
+from restaurant_revenue_estimator.engine.pnl import (
+    jfc_benchmark_rows,
+    jfc_comparison,
+)
 from restaurant_revenue_estimator.engine.scenario import sensitivity
 from restaurant_revenue_estimator.inputs import StoreInputs, load_store
 from restaurant_revenue_estimator.models import Run, Scenario
+from restaurant_revenue_estimator.report import load_benchmark
 from restaurant_revenue_estimator.repositories.scenario_repo import (
     RunRepository,
     ScenarioRepository,
     is_default_run,
 )
-from restaurant_revenue_estimator.services.evaluation import EvaluationRequest, plain
+from restaurant_revenue_estimator.services.evaluation import (
+    EvaluationRequest,
+    floor1_table_counts,
+    plain,
+)
 from restaurant_revenue_estimator.services.evaluation_service import (
     RunRequest,
     execute_run,
+)
+from restaurant_revenue_estimator.services.screens import (
+    build_daily_table_rows,
+    build_monthly_table_rows,
+    extract_cost_assumptions,
 )
 from restaurant_revenue_estimator.services.store_service import (
     evidence_rows,
@@ -237,6 +251,33 @@ def index(request: Request, session: Session = Depends(get_session)) -> HTMLResp
     return _render(request, "index.html", stores=stores, latest=latest)
 
 
+def _get_store_external_urls(inputs: StoreInputs) -> list[dict[str, str]]:
+    store = inputs.files.get("store.yaml", {}) or {}
+    urls: list[dict[str, str]] = []
+    official = plain(store.get("official_url") or store.get("url"))
+    if official:
+        urls.append({"label": "公式 URL", "url": str(official)})
+    external_ids = store.get("external_ids", {}) or {}
+    for name, item in external_ids.items():
+        val = str(plain(item))
+        url = None
+        if isinstance(item, dict) and item.get("sources"):
+            for sid in item.get("sources", []):
+                src = inputs.sources.get(sid)
+                if src and src.url:
+                    url = src.url
+                    break
+        if not url:
+            for src in inputs.sources.values():
+                if "tabelog.com" in src.url and val in src.url:
+                    url = src.url
+                    break
+        if url:
+            label = "食べログ" if name == "tabelog" else name
+            urls.append({"label": label, "url": url})
+    return urls
+
+
 @router.get("/stores/{store_id}", response_class=HTMLResponse)
 def store_summary(
     request: Request,
@@ -251,6 +292,18 @@ def store_summary(
     raw = _run_result(selected_run) if selected_run else None
     result = _active_variant(raw, variant)
     variants = _extract_variants(raw)
+    external_urls = _get_store_external_urls(inputs)
+    operations = inputs.files.get("operations.yaml", {}) or {}
+    closure_candidates = (
+        operations.get("saturday_closure_start", {}).get("candidates", {})
+        if isinstance(operations.get("saturday_closure_start"), dict)
+        else {}
+    )
+    hours_candidates = (
+        operations.get("saturday_hours_before_closure", {}).get("candidates", {})
+        if isinstance(operations.get("saturday_hours_before_closure"), dict)
+        else {}
+    )
     return _render(
         request,
         "stores/summary.html",
@@ -260,6 +313,9 @@ def store_summary(
         result=result,
         variants=variants,
         banner=banner,
+        external_urls=external_urls,
+        saturday_closure_candidates=closure_candidates,
+        saturday_hours_candidates=hours_candidates,
     )
 
 
@@ -290,6 +346,7 @@ def store_revenue(
     tax: str = "inc",
     run: int | None = None,
     variant: str | None = None,
+    month: int | None = None,
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     selected_run, banner = _resolve_run(session, store_id, run)
@@ -300,8 +357,8 @@ def store_revenue(
     months = result["revenue"]["months"]
     key = "total_inc_tax" if tax == "inc" else "total_ex_tax"
     chart = {
-        "labels": [f"{month['month']}月" for month in months],
-        "values": [month[key] for month in months],
+        "labels": [f"{m['month']}月" for m in months],
+        "values": [m[key] for m in months],
     }
 
     scenario_order = {"pessimistic": 0, "standard": 1, "optimistic": 2}
@@ -322,6 +379,39 @@ def store_revenue(
         for s in raw_scenarios
     ]
 
+    has_other = any(m.get("other_inc_tax", 0) > 0 for m in months)
+    table_rows = build_monthly_table_rows(months, tax, has_other)
+    year_summary = {
+        "lunch": sum(r["lunch"] for r in table_rows),
+        "dinner": sum(r["dinner"] for r in table_rows),
+        "ala": sum(r["ala"] for r in table_rows),
+        "course": sum(r["course"] for r in table_rows),
+        "appetizer": sum(r["appetizer"] for r in table_rows),
+        "other": sum(r["other"] for r in table_rows),
+        "total": sum(r["total"] for r in table_rows),
+    }
+
+    all_days = result.get("days") or result.get("revenue", {}).get("days", [])
+    selected_month: int | None = None
+    daily_rows: list[dict[str, Any]] = []
+    daily_has_other = False
+    daily_total = 0
+
+    if month is not None and 1 <= month <= 12:
+        selected_month = month
+        month_prefix = f"-{month:02d}-"
+        m_days = [
+            d
+            for d in all_days
+            if (month_prefix in d.get("date", "") or month_prefix in d.get("day", ""))
+        ]
+        daily_has_other = any(d.get("other", 0) > 0 for d in m_days)
+        daily_rows, daily_total = build_daily_table_rows(
+            m_days, months, month, tax, daily_has_other
+        )
+
+    resolved_run_id = selected_run.id if selected_run else run
+
     return _render(
         request,
         "stores/revenue.html",
@@ -329,12 +419,19 @@ def store_revenue(
         result=result,
         variants=variants,
         months=months,
-        total=result["revenue"][key],
+        table_rows=table_rows,
+        year_summary=year_summary,
+        has_other=has_other,
+        total=year_summary["total"],
         tax=tax,
         chart=json.dumps(chart, ensure_ascii=False),
         variant_scenarios=variant_scenarios,
         banner=banner,
-        run_id=run,
+        run_id=resolved_run_id,
+        selected_month=selected_month,
+        daily_rows=daily_rows,
+        daily_has_other=daily_has_other,
+        daily_total=daily_total,
     )
 
 
@@ -452,6 +549,7 @@ def store_layout(
         result=result,
         variants=variants,
         banner=banner,
+        floor2_candidates=_floor2_candidates(inputs),
     )
 
 
@@ -495,6 +593,7 @@ def store_simulator(
     )
     selected_scenario = None
     selected_overrides: dict[str, Any] = {}
+    floor1_four, floor1_two = floor1_table_counts(inputs)
     floor2_choice: str = ""
     floor2_four: int | str = ""
     floor2_two: int | str = ""
@@ -531,6 +630,8 @@ def store_simulator(
         saved=saved,
         selected_scenario=selected_scenario,
         selected_overrides=selected_overrides,
+        floor1_four=floor1_four,
+        floor1_two=floor1_two,
         floor2_candidates=_floor2_candidates(inputs),
         floor2_choice=floor2_choice,
         floor2_four=floor2_four,
@@ -572,6 +673,7 @@ async def submit_simulator(
             result = (
                 _active_variant(_run_result(selected_run)) if selected_run else None
             )
+            floor1_four, floor1_two = floor1_table_counts(inputs)
             return _render(
                 request,
                 "stores/simulator.html",
@@ -582,6 +684,8 @@ async def submit_simulator(
                 result=result,
                 saved=False,
                 error=error_msg,
+                floor1_four=floor1_four,
+                floor1_two=floor1_two,
                 floor2_candidates=_floor2_candidates(inputs),
                 floor2_choice="custom",
                 floor2_four=raw_4p,
@@ -646,21 +750,18 @@ def store_costs(
     variant: str | None = None,
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
-    inputs = _get_store(store_id)
     selected_run, banner = _resolve_run(session, store_id, run)
     raw = _run_result(selected_run) if selected_run else None
     result = _active_variant(raw, variant)
     variants = _extract_variants(raw)
     assert result is not None
-    assumptions = inputs.files.get("assumptions/standard.yaml", {}) or {}
     warnings = list(result.get("warnings") or [])
     pnl = result["pnl"]
-    denominator = pnl["gross_inc_tax"] or 1
-    jfc = {
-        "gross_profit_ratio": pnl["gross_profit"] / denominator,
-        "labor_ratio": (pnl["labor"] + pnl["owner_labor"]) / denominator,
-        "operating_margin": pnl["store_operating_profit"] / denominator,
-    }
+    benchmark_path = data_directory() / "benchmarks" / "jfc_2025_izakaya.yaml"
+    benchmark = load_benchmark(benchmark_path) if benchmark_path.exists() else {}
+    jfc = jfc_comparison(pnl)
+    jfc_rows = jfc_benchmark_rows(pnl, benchmark, null_label="—（公表値なし）")
+    cost_data = extract_cost_assumptions(result=result, raw=raw)
     return _render(
         request,
         "stores/costs.html",
@@ -668,10 +769,11 @@ def store_costs(
         result=result,
         variants=variants,
         pnl=pnl,
-        assumptions=assumptions,
         warnings=warnings,
         jfc=jfc,
+        jfc_rows=jfc_rows,
         banner=banner,
+        **cost_data,
     )
 
 

@@ -4,7 +4,7 @@
 
 {% block content %}
 {% include "stores/_variant_nav.html" %}
-<h1 class="text-2xl font-bold text-gray-800 mb-4">座席・卓（{{ result.name }}）</h1>
+<h1 class="text-2xl font-bold text-gray-800 mb-4">座席・卓（{{ result.name or result.variant or '' }}）</h1>
 
 <div class="grid gap-6 md:grid-cols-2">
     {% for floor in floor_rows %}
@@ -40,12 +40,76 @@
 
 <section class="bg-white rounded-lg shadow p-4 mt-6">
     <h2 class="font-bold text-gray-800 mb-2">有効着席人数（シミュレーション結果）</h2>
+    {% set physical_seats = result.physical_seats if (result.physical_seats is defined and result.physical_seats) else (result.simulation.tables | sum(attribute='seats') if (result.simulation and result.simulation.tables) else '—') %}
+    <dl class="grid gap-4 md:grid-cols-3 text-sm mb-4">
+        <div class="border rounded p-3">
+            <dt class="text-gray-500">物理席数</dt>
+            <dd class="text-xl font-bold text-gray-800 mt-1">{{ physical_seats }} 席</dd>
+        </div>
+        <div class="border rounded p-3">
+            <dt class="text-gray-500">昼の着席人数の最大{% if result.lunch_weekday_used is defined and result.lunch_weekday_used %}（{{ result.lunch_weekday_used }}）{% endif %}</dt>
+            <dd class="text-xl font-bold text-gray-800 mt-1">
+                {% if result.lunch_occupancy_max is defined and result.lunch_occupancy_max is not none %}
+                    {{ "%.1f"|format(result.lunch_occupancy_max) }} 人
+                {% else %}
+                    未記録
+                {% endif %}
+            </dd>
+            <p class="text-xs text-gray-400 mt-1">1 分刻みの同時着席人数（replications 平均）</p>
+        </div>
+        <div class="border rounded p-3">
+            <dt class="text-gray-500">12:00〜13:00 の平均{% if result.lunch_weekday_used is defined and result.lunch_weekday_used %}（{{ result.lunch_weekday_used }}）{% endif %}</dt>
+            <dd class="text-xl font-bold text-gray-800 mt-1">
+                {% if result.lunch_occupancy_12_13_avg is defined and result.lunch_occupancy_12_13_avg is not none %}
+                    {{ "%.1f"|format(result.lunch_occupancy_12_13_avg) }} 人
+                {% else %}
+                    未記録
+                {% endif %}
+            </dd>
+            <p class="text-xs text-gray-400 mt-1">ピーク時間帯の平均着席人数</p>
+        </div>
+    </dl>
     <p class="text-sm text-gray-600">
-        使った卓: {{ result.simulation.tables | length }} 卓 /
-        {{ result.simulation.tables | sum(attribute='seats') }} 席。
+        使った卓: {{ result.simulation.tables | length if (result.simulation and result.simulation.tables) else 0 }} 卓 /
+        物理席数: {{ physical_seats }} 席。
+        {% if result.simulation and result.simulation.lunch_guests_by_weekday %}
         昼の入店客数は曜日別に
-        {% for weekday, guests in result.simulation.lunch_guests_by_weekday.items() %}{{ weekday }} {{ guests }} 人{% if not loop.last %}、{% endif %}{% endfor %}。
+        {% set wd_order = [('mon', '月'), ('tue', '火'), ('wed', '水'), ('thu', '木'), ('fri', '金'), ('sat', '土'), ('sun', '日')] %}
+        {% set items = [] %}
+        {% for en, jp in wd_order %}
+            {% if en in result.simulation.lunch_guests_by_weekday %}
+                {% set _ = items.append(jp ~ ' ' ~ result.simulation.lunch_guests_by_weekday[en] ~ ' 人') %}
+            {% elif jp in result.simulation.lunch_guests_by_weekday %}
+                {% set _ = items.append(jp ~ ' ' ~ result.simulation.lunch_guests_by_weekday[jp] ~ ' 人') %}
+            {% endif %}
+        {% endfor %}
+        {{ items | join('、') }}。
+        {% endif %}
     </p>
-    <p class="text-xs text-gray-500 mt-2">物理席数は客数の上限ではない。卓のミスマッチ・待ち・離脱をシミュレーションで扱う。</p>
+    <p class="text-xs text-gray-500 mt-2">
+        ※ 昼の 1 分ごとの着席人数は {{ result.lunch_weekday_used if (result.lunch_weekday_used is defined and result.lunch_weekday_used) else '平日' }}（{{ result.run.replications if (result.run and result.run.replications is defined) else '20' }} replications 平均）の時系列を使用。物理席数は客数の上限ではない。卓のミスマッチ・待ち・離脱をシミュレーションで扱う。
+    </p>
 </section>
+
+<form method="post" action="/stores/{{ store_id }}/simulator" class="bg-white rounded-lg shadow p-4 mt-6">
+    <h2 class="font-bold text-gray-800 mb-2">2 階の卓構成を変更して試算（シミュレーターへ送信）</h2>
+    <fieldset class="border rounded p-3 mb-3">
+        <legend class="text-sm font-medium px-1 text-gray-700">2 階の卓構成（UNRESOLVED）</legend>
+        <div class="mb-3">
+            <label class="block text-sm font-medium text-gray-700 mb-1" for="floor2_choice">2 階の候補</label>
+            <select id="floor2_choice" name="floor2_choice" class="border rounded px-2 py-1 text-sm w-full md:w-auto">
+                <option value="">YAML の候補すべて（上書きしない）</option>
+                {% for cand in floor2_candidates %}
+                <option value="{{ cand }}" {% if result.name == cand or result.variant == cand %}selected{% endif %}>{{ cand }}</option>
+                {% endfor %}
+                <option value="custom">自由入力</option>
+            </select>
+        </div>
+        <div class="flex flex-wrap gap-4 text-sm">
+            <label>4 人卓 <input name="floor2_4p" type="number" min="0" class="border rounded px-2 py-1 w-20" value=""></label>
+            <label>2 人卓 <input name="floor2_2p" type="number" min="0" class="border rounded px-2 py-1 w-20" value=""></label>
+        </div>
+    </fieldset>
+    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">シミュレーターで試算を実行する</button>
+</form>
 {% endblock %}
