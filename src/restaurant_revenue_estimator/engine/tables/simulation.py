@@ -131,6 +131,26 @@ def simulate(  # noqa: PLR0912, PLR0915
                     (block.start_minute, block.end_minute + config.cleanup_minutes)
                 )
 
+    floor_idx = {floor_id: i for i, floor_id in enumerate(floor_order)}
+    active_floors = [
+        floor_id
+        for floor_id in floor_order
+        if floor_policy.get(floor_id, "always") != "never"
+    ]
+    tables_by_floor: dict[str, list[Table]] = {
+        floor_id: [t for t in tables if t.floor == floor_id]
+        for floor_id in active_floors
+    }
+    lower_tables_by_floor: dict[str, list[Table]] = {
+        floor_id: [
+            t
+            for t in tables
+            if floor_idx[t.floor] < floor_idx[floor_id]
+            and floor_policy.get(t.floor, "always") != "never"
+        ]
+        for floor_id in active_floors
+    }
+
     queue: list[_Waiting] = []
     lost_by_reason: dict[str, int] = {}
     lost_groups_by_reason: dict[str, int] = {}
@@ -160,37 +180,32 @@ def simulate(  # noqa: PLR0912, PLR0915
 
     def find_table(size: int, minute: int, stay: int) -> Table | None:
         end = minute + stay + config.cleanup_minutes
+
+        def _is_available(table: Table) -> bool:
+            if table.seats < size or free_at[table.id] > minute:
+                return False
+            table_res = reserved[table.id]
+            if not table_res:
+                return True
+            return not any(
+                start < end and minute < stop for start, stop in table_res
+            )
+
         candidates: list[Table] = []
-        for floor_id in floor_order:
-            policy = floor_policy.get(floor_id, "always")
-            if policy == "never":
-                continue
-            floor_tables = [
-                table
-                for table in tables
-                if table.floor == floor_id
-                and table.seats >= size
-                and free_at[table.id] <= minute
-                and not any(
-                    start < end and minute < stop for start, stop in reserved[table.id]
-                )
-            ]
-            if policy == "when_lower_full":
-                lower_available = any(
-                    table.seats >= size
-                    and free_at[table.id] <= minute
-                    and not any(
-                        start < end and minute < stop
-                        for start, stop in reserved[table.id]
-                    )
-                    for table in tables
-                    if floor_order.index(table.floor) < floor_order.index(floor_id)
-                    and floor_policy.get(table.floor, "always") != "never"
-                )
+        for floor_id in active_floors:
+            if floor_policy.get(floor_id, "always") == "when_lower_full":
+                lower_available = False
+                for table in lower_tables_by_floor[floor_id]:
+                    if _is_available(table):
+                        lower_available = True
+                        break
                 if lower_available:
                     continue
-            candidates.extend(floor_tables)
-            if candidates:
+            floor_tables = [
+                table for table in tables_by_floor[floor_id] if _is_available(table)
+            ]
+            if floor_tables:
+                candidates = floor_tables
                 break
         if not candidates:
             return None

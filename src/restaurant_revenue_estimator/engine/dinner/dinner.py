@@ -239,11 +239,13 @@ def build_course_parties(
     sizes = list(size_distribution.keys())
     probs = np.array(list(size_distribution.values()), dtype=float)
     probs /= probs.sum()
+    cdf = probs.cumsum()
+    cdf /= cdf[-1]
 
     parties: list[int] = []
     remaining = course_guests
     while remaining > 0:
-        size = int(rng.choice(sizes, p=probs))
+        size = sizes[int(np.searchsorted(cdf, rng.random(), side="right"))]
         if remaining <= size:
             if remaining < 3 and len(parties) > 0:
                 parties[-1] += remaining
@@ -343,11 +345,13 @@ def _build_walk_in_parties(
     sizes = list(size_distribution.keys())
     probs = np.array(list(size_distribution.values()), dtype=float)
     probs /= probs.sum()
+    cdf = probs.cumsum()
+    cdf /= cdf[-1]
 
     parties: list[int] = []
     remaining = walk_in_guests
     while remaining > 0:
-        size = int(rng.choice(sizes, p=probs))
+        size = sizes[int(np.searchsorted(cdf, rng.random(), side="right"))]
         if remaining <= size:
             parties.append(remaining)
             break
@@ -391,10 +395,12 @@ def _schedule_walk_in_arrivals(
     else:
         weights[:] = 1.0 / num_slots
     probs = weights / weights.sum()
+    cdf = probs.cumsum()
+    cdf /= cdf[-1]
 
     arrivals: list[Arrival] = []
     for size in parties:
-        slot_idx = int(rng.choice(num_slots, p=probs))
+        slot_idx = int(np.searchsorted(cdf, rng.random(), side="right"))
         offset = int(rng.integers(0, 5))
         minute = open_minute + slot_idx * 5 + offset
         if minute >= last_entry_minute:

@@ -567,3 +567,19 @@ def test_tc_42_11_simulate_dinner_day_cache(
     assert res4 == res2
 
 
+def test_tc_42_12_evaluation_deterministic_across_cleared_cache() -> None:
+    req = EvaluationRequest(
+        store_id="birdman_tamachi",
+        assumption_set="standard",
+        seed=42,
+        replications=2,
+        overrides={"layout.floor2": "f2_42"},
+    )
+    clear_dinner_day_cache()
+    first = evaluate(DATA_DIR, req)
+    clear_dinner_day_cache()
+    second = evaluate(DATA_DIR, req)
+    assert first == second
+
+
+
