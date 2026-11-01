@@ -105,6 +105,7 @@ def simulate(  # noqa: PLR0912, PLR0915
     group_probs: Sequence[float] = (0.25, 0.5, 0.15, 0.1),
     stay_minutes: int = 40,
     stay_spread: int = 5,
+    record_series: bool = True,
 ) -> SimulationResult:
     """1 日分を回す. arrivals を渡すと台本モード."""
     rng = np.random.default_rng(seed)
@@ -268,13 +269,14 @@ def simulate(  # noqa: PLR0912, PLR0915
                 current_occupied_people -= size
                 current_occupied_tables[floor_id] -= 1
 
-        occupied_series.append(current_occupied_people)
-        for floor_id in floor_order:
-            occupied_tables_series[floor_id].append(
-                current_occupied_tables[floor_id]
-            )
-        queue_people_series.append(current_queue_people)
-        queue_groups_series.append(len(queue))
+        if record_series:
+            occupied_series.append(current_occupied_people)
+            for floor_id in floor_order:
+                occupied_tables_series[floor_id].append(
+                    current_occupied_tables[floor_id]
+                )
+            queue_people_series.append(current_queue_people)
+            queue_groups_series.append(len(queue))
 
     for group in queue:
         lose(group, "closing")

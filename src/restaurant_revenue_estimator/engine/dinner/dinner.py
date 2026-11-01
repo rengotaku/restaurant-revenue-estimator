@@ -517,6 +517,7 @@ def _simulate_one_replication(
         config=sim_config,
         arrivals=rep_walk_in_arrivals,
         reservations=allocated_blocks,
+        record_series=False,
     )
     walk_in_entered = sim_result.entered_guests
     walk_in_lost = sim_result.lost_guests
