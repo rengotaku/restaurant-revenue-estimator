@@ -90,7 +90,7 @@ addopts = "-v --tb=short"
 
 [tool.coverage.run]
 source = ["src/restaurant_revenue_estimator"]
-branch = true
+branch = false
 relative_files = true
 omit = [
     "src/restaurant_revenue_estimator/alembic/*",

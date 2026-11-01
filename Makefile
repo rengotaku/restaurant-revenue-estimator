@@ -42,7 +42,7 @@ test: _build-assets
 
 ## test-cov: Run tests with coverage
 test-cov: _build-assets
-	uv run pytest --cov=src/restaurant_revenue_estimator --cov-report=term-missing
+	COVERAGE_CORE=sysmon uv run pytest --cov=src/restaurant_revenue_estimator --cov-report=term-missing
 
 ## check: Run lint + typecheck
 check: lint typecheck

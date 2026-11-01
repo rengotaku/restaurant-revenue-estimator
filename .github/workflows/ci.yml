@@ -38,3 +38,5 @@ jobs:
 
       - name: Test
         run: uv run pytest --cov=src/restaurant_revenue_estimator --cov-report=term-missing
+        env:
+          COVERAGE_CORE: sysmon
