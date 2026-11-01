@@ -296,4 +296,4 @@ def render_markdown(  # noqa: PLR0915
 
 
 def load_benchmark(path: Path) -> dict[str, Any]:
-    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    return yaml.load(path.read_text(encoding="utf-8"), Loader=yaml.CSafeLoader) or {}

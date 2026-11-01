@@ -78,7 +78,7 @@ class StoreInputs:
 
 def _read_yaml(path: Path) -> Any:
     try:
-        return yaml.safe_load(path.read_text(encoding="utf-8"))
+        return yaml.load(path.read_text(encoding="utf-8"), Loader=yaml.CSafeLoader)
     except (OSError, yaml.YAMLError) as exc:
         raise InputError(f"{path.name}: YAML を読めない: {exc}") from exc
 

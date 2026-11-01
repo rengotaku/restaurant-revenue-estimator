@@ -60,7 +60,10 @@ class CalendarSeries:
 def load_holidays(csv_path: Path, meta_path: Path, year: int) -> dict[date, str]:
     """内閣府 CSV を読む. sha256 と年を検査する."""
     raw = csv_path.read_bytes()
-    meta = yaml.safe_load(meta_path.read_text(encoding="utf-8")) or {}
+    meta = (
+        yaml.load(meta_path.read_text(encoding="utf-8"), Loader=yaml.CSafeLoader)
+        or {}
+    )
     expected = meta.get("sha256")
     actual = hashlib.sha256(raw).hexdigest()
     if expected and expected != actual:

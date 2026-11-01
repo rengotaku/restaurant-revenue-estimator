@@ -69,7 +69,10 @@ def load_legacy(directory: Path) -> dict[str, Any]:
     path = directory / "legacy" / "v5.yaml"
     if not path.exists():
         raise LegacyError(f"{path} が無い")
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    data = (
+        yaml.load(path.read_text(encoding="utf-8"), Loader=yaml.CSafeLoader)
+        or {}
+    )
     if data.get("kind") != "legacy_scenario":
         raise LegacyError(f"{path} の kind が legacy_scenario でない")
     if data.get("is_actual") is not False:
