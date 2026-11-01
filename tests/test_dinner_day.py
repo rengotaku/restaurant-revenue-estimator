@@ -3,6 +3,7 @@
 import shutil
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
@@ -19,8 +20,10 @@ from restaurant_revenue_estimator.engine.dinner import (
     allocate_reservations,
     build_course_parties,
     can_extend,
+    clear_dinner_day_cache,
     simulate_dinner_day,
 )
+from restaurant_revenue_estimator.engine.dinner import dinner as dinner_module
 from restaurant_revenue_estimator.engine.tables import (
     Arrival,
     Floor,
@@ -501,4 +504,66 @@ def test_regression_course_start_window_validation() -> None:
     )
     with pytest.raises(EvaluationError):
         evaluate(DATA_DIR, req_late)
+
+
+def test_tc_42_11_simulate_dinner_day_cache(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clear_dinner_day_cache()
+
+    call_count = 0
+    orig_sim_rep = dinner_module._simulate_one_replication
+
+    def counting_sim_rep(*args: Any, **kwargs: Any) -> Any:
+        nonlocal call_count
+        call_count += 1
+        return orig_sim_rep(*args, **kwargs)
+
+    monkeypatch.setattr(dinner_module, "_simulate_one_replication", counting_sim_rep)
+
+    tables = [Table("t1", 4, "1f")]
+    floors = [Floor("1f", "always")]
+    courses = {
+        "c1": CourseSpec("c1", "標準コース", 5000, 120, min_guests=2, max_guests=10),
+    }
+    kwargs: dict[str, Any] = {
+        "tables": tables,
+        "floors": floors,
+        "desired_guests": 20,
+        "course_ratio": 0.5,
+        "courses": courses,
+        "dinner_stay_minutes": 120,
+        "cleanup_minutes": 5,
+        "open_minute": 0,
+        "last_entry_minute": 240,
+        "close_minute": 300,
+        "replications": 1,
+        "seed": 42,
+    }
+
+    # 1 回目
+    res1 = simulate_dinner_day(**kwargs)
+    assert call_count == 1
+
+    # 同じ引数で 2 回呼ぶと、2 回目は 1 日分の試行を呼ばない
+    res2 = simulate_dinner_day(**kwargs)
+    assert call_count == 1
+    # 2 つの戻り値は等しく、同じオブジェクトではない
+    assert res1 == res2
+    assert res1 is not res2
+
+    # desired_guests だけ 1 増やすと計算し直す
+    kwargs_diff = dict(kwargs)
+    kwargs_diff["desired_guests"] = 21
+    res3 = simulate_dinner_day(**kwargs_diff)
+    assert call_count == 2
+    assert res3 != res1
+
+    # 1 回目の戻り値の lost_by_reason を書き換えても、
+    # 同じ引数の 2 回目の戻り値は変わらない
+    res1.lost_by_reason["mutated_key"] = 9999
+    res4 = simulate_dinner_day(**kwargs)
+    assert "mutated_key" not in res4.lost_by_reason
+    assert res4 == res2
+
 

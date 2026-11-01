@@ -1,9 +1,12 @@
 """夜の需要・コース比率・団体予約."""
 
+import copy
 import math
+from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
+from typing import Any
 
 import numpy as np
 
@@ -547,7 +550,79 @@ def _simulate_one_replication(
     )
 
 
-def simulate_dinner_day(
+_DINNER_DAY_CACHE_MAXSIZE = 8192
+_dinner_day_cache: OrderedDict[tuple[Any, ...], DinnerDayResult] = OrderedDict()
+
+
+def clear_dinner_day_cache() -> None:
+    """simulate_dinner_day のキャッシュをクリアする."""
+    _dinner_day_cache.clear()
+
+
+def _freeze_dict(d: dict[Any, Any] | None) -> tuple[tuple[Any, Any], ...] | None:
+    if d is None:
+        return None
+    return tuple(sorted(d.items()))
+
+
+def _make_dinner_day_cache_key(
+    tables: Sequence[Table],
+    floors: Sequence[Floor],
+    desired_guests: int,
+    course_ratio: float,
+    courses: dict[str, CourseSpec],
+    dinner_stay_minutes: int,
+    dinner_peak_share: float,
+    dinner_group_size_distribution: dict[int, float] | None,
+    course_party_size_distribution: dict[int, float] | None,
+    course_start_window: dict[str, str] | tuple[int, int] | None,
+    course_extension_rate: float,
+    can_extend_today: bool,
+    cleanup_minutes: int,
+    max_wait_minutes: int,
+    open_minute: int,
+    last_entry_minute: int,
+    close_minute: int,
+    open_clock: str,
+    replications: int,
+    seed: int | None,
+    walk_in_arrivals: Sequence[Arrival] | None,
+) -> tuple[Any, ...]:
+    if isinstance(course_start_window, dict):
+        frozen_window: tuple[Any, ...] | None = tuple(
+            sorted(course_start_window.items())
+        )
+    elif isinstance(course_start_window, (tuple, list)):
+        frozen_window = tuple(course_start_window)
+    else:
+        frozen_window = None
+
+    return (
+        tuple(tables),
+        tuple(floors),
+        desired_guests,
+        course_ratio,
+        tuple(sorted(courses.items())),
+        dinner_stay_minutes,
+        dinner_peak_share,
+        _freeze_dict(dinner_group_size_distribution),
+        _freeze_dict(course_party_size_distribution),
+        frozen_window,
+        course_extension_rate,
+        can_extend_today,
+        cleanup_minutes,
+        max_wait_minutes,
+        open_minute,
+        last_entry_minute,
+        close_minute,
+        open_clock,
+        replications,
+        seed,
+        tuple(walk_in_arrivals) if walk_in_arrivals is not None else None,
+    )
+
+
+def simulate_dinner_day(  # noqa: PLR0915
     *,
     tables: Sequence[Table],
     floors: Sequence[Floor] = (),
@@ -578,6 +653,34 @@ def simulate_dinner_day(
         raise ValueError("replications は 1 以上")
     if not (0.0 <= course_ratio <= 1.0) or not math.isfinite(course_ratio):
         raise ValueError("course_ratio は 0〜1")
+
+    cache_key = _make_dinner_day_cache_key(
+        tables=tables,
+        floors=floors,
+        desired_guests=desired_guests,
+        course_ratio=course_ratio,
+        courses=courses,
+        dinner_stay_minutes=dinner_stay_minutes,
+        dinner_peak_share=dinner_peak_share,
+        dinner_group_size_distribution=dinner_group_size_distribution,
+        course_party_size_distribution=course_party_size_distribution,
+        course_start_window=course_start_window,
+        course_extension_rate=course_extension_rate,
+        can_extend_today=can_extend_today,
+        cleanup_minutes=cleanup_minutes,
+        max_wait_minutes=max_wait_minutes,
+        open_minute=open_minute,
+        last_entry_minute=last_entry_minute,
+        close_minute=close_minute,
+        open_clock=open_clock,
+        replications=replications,
+        seed=seed,
+        walk_in_arrivals=walk_in_arrivals,
+    )
+
+    if cache_key in _dinner_day_cache:
+        _dinner_day_cache.move_to_end(cache_key)
+        return copy.deepcopy(_dinner_day_cache[cache_key])
 
     walk_in_group_dist = dinner_group_size_distribution or {
         1: 0.15,
@@ -667,7 +770,7 @@ def simulate_dinner_day(
     }
     first_reservations = rep_results[0].reservations if rep_results else ()
 
-    return DinnerDayResult(
+    result = DinnerDayResult(
         replications=tuple(rep_results),
         entered_guests=avg_entered,
         lost_guests=avg_lost,
@@ -681,3 +784,8 @@ def simulate_dinner_day(
         lost_by_reason=avg_lost_by_reason,
         reservations=first_reservations,
     )
+    _dinner_day_cache[cache_key] = result
+    if len(_dinner_day_cache) > _DINNER_DAY_CACHE_MAXSIZE:
+        _dinner_day_cache.popitem(last=False)
+    return copy.deepcopy(result)
+
