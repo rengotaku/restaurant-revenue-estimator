@@ -100,6 +100,21 @@ def sensitivity(
         inputs.files.get(f"assumptions/{request.assumption_set}.yaml", {}) or {}
     )
 
+    row_small = small
+    if "layout.floor2" not in (small.overrides or {}) and baseline.variant:
+        row_overrides = dict(small.overrides or {})
+        row_overrides["layout.floor2"] = baseline.variant
+        row_small = EvaluationRequest(
+            store_id=small.store_id,
+            assumption_set=small.assumption_set,
+            year=small.year,
+            calendar_mode=small.calendar_mode,
+            seed=small.seed,
+            replications=small.replications,
+            overrides=row_overrides,
+            saturday_closure=small.saturday_closure,
+        )
+
     rows: list[SensitivityRow] = []
     for key, raw in assumptions.items():
         status = raw.get("status")
@@ -108,13 +123,19 @@ def sensitivity(
             for name in ("low", "high"):
                 value = raw["range"].get(name)
                 rows.append(
-                    _row(data_dir, small, baseline, key, name, value, how_to_verify)
+                    _row(data_dir, row_small, baseline, key, name, value, how_to_verify)
                 )
         elif status == "UNRESOLVED":
             for name, value in (raw.get("candidates") or {}).items():
                 rows.append(
                     _row(
-                        data_dir, small, baseline, key, str(name), value, how_to_verify
+                        data_dir,
+                        row_small,
+                        baseline,
+                        key,
+                        str(name),
+                        value,
+                        how_to_verify,
                     )
                 )
 
@@ -167,6 +188,8 @@ def _row(
     how_to_verify: str,
 ) -> SensitivityRow:
     overrides = dict(request.overrides or {})
+    if "layout.floor2" not in overrides and baseline.variant:
+        overrides["layout.floor2"] = baseline.variant
     overrides[key] = value
     candidate = EvaluationRequest(
         store_id=request.store_id,

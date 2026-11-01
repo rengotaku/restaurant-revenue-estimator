@@ -256,3 +256,13 @@ def test_validate_does_not_modify_inputs(tmp_path: Path) -> None:
     validate_store(directory)
     assert (directory / "layout.yaml").read_bytes() == before
     shutil.rmtree(directory)
+
+
+def test_tc_42_08_csafe_loader_matches_safe_loader() -> None:
+    data_dir = Path(__file__).resolve().parents[1] / "data"
+    yaml_files = sorted(data_dir.rglob("*.yaml"))
+    assert yaml_files, "data/ 配下に .yaml ファイルが存在すること"
+    for path in yaml_files:
+        text = path.read_text(encoding="utf-8")
+        assert yaml.load(text, Loader=yaml.CSafeLoader) == yaml.safe_load(text)
+

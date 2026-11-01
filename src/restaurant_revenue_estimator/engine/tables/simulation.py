@@ -105,6 +105,7 @@ def simulate(  # noqa: PLR0912, PLR0915
     group_probs: Sequence[float] = (0.25, 0.5, 0.15, 0.1),
     stay_minutes: int = 40,
     stay_spread: int = 5,
+    record_series: bool = True,
 ) -> SimulationResult:
     """1 日分を回す. arrivals を渡すと台本モード."""
     rng = np.random.default_rng(seed)
@@ -129,6 +130,27 @@ def simulate(  # noqa: PLR0912, PLR0915
                 reserved[table_id].append(
                     (block.start_minute, block.end_minute + config.cleanup_minutes)
                 )
+
+    floor_idx = {floor_id: i for i, floor_id in enumerate(floor_order)}
+    active_floors = [
+        floor_id
+        for floor_id in floor_order
+        if floor_policy.get(floor_id, "always") != "never"
+    ]
+    tables_by_floor: dict[str, list[Table]] = {
+        floor_id: [t for t in tables if t.floor == floor_id]
+        for floor_id in active_floors
+    }
+    lower_tables_by_floor: dict[str, list[Table]] = {
+        floor_id: [
+            t
+            for t in tables
+            if t.floor in floor_idx
+            and floor_idx[t.floor] < floor_idx[floor_id]
+            and floor_policy.get(t.floor, "always") != "never"
+        ]
+        for floor_id in active_floors
+    }
 
     queue: list[_Waiting] = []
     lost_by_reason: dict[str, int] = {}
@@ -159,37 +181,32 @@ def simulate(  # noqa: PLR0912, PLR0915
 
     def find_table(size: int, minute: int, stay: int) -> Table | None:
         end = minute + stay + config.cleanup_minutes
+
+        def _is_available(table: Table) -> bool:
+            if table.seats < size or free_at[table.id] > minute:
+                return False
+            table_res = reserved[table.id]
+            if not table_res:
+                return True
+            return not any(
+                start < end and minute < stop for start, stop in table_res
+            )
+
         candidates: list[Table] = []
-        for floor_id in floor_order:
-            policy = floor_policy.get(floor_id, "always")
-            if policy == "never":
-                continue
-            floor_tables = [
-                table
-                for table in tables
-                if table.floor == floor_id
-                and table.seats >= size
-                and free_at[table.id] <= minute
-                and not any(
-                    start < end and minute < stop for start, stop in reserved[table.id]
-                )
-            ]
-            if policy == "when_lower_full":
-                lower_available = any(
-                    table.seats >= size
-                    and free_at[table.id] <= minute
-                    and not any(
-                        start < end and minute < stop
-                        for start, stop in reserved[table.id]
-                    )
-                    for table in tables
-                    if floor_order.index(table.floor) < floor_order.index(floor_id)
-                    and floor_policy.get(table.floor, "always") != "never"
-                )
+        for floor_id in active_floors:
+            if floor_policy.get(floor_id, "always") == "when_lower_full":
+                lower_available = False
+                for table in lower_tables_by_floor[floor_id]:
+                    if _is_available(table):
+                        lower_available = True
+                        break
                 if lower_available:
                     continue
-            candidates.extend(floor_tables)
-            if candidates:
+            floor_tables = [
+                table for table in tables_by_floor[floor_id] if _is_available(table)
+            ]
+            if floor_tables:
+                candidates = floor_tables
                 break
         if not candidates:
             return None
@@ -268,13 +285,14 @@ def simulate(  # noqa: PLR0912, PLR0915
                 current_occupied_people -= size
                 current_occupied_tables[floor_id] -= 1
 
-        occupied_series.append(current_occupied_people)
-        for floor_id in floor_order:
-            occupied_tables_series[floor_id].append(
-                current_occupied_tables[floor_id]
-            )
-        queue_people_series.append(current_queue_people)
-        queue_groups_series.append(len(queue))
+        if record_series:
+            occupied_series.append(current_occupied_people)
+            for floor_id in floor_order:
+                occupied_tables_series[floor_id].append(
+                    current_occupied_tables[floor_id]
+                )
+            queue_people_series.append(current_queue_people)
+            queue_groups_series.append(len(queue))
 
     for group in queue:
         lose(group, "closing")

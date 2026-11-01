@@ -2,6 +2,7 @@
 
 import shutil
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -10,8 +11,13 @@ from restaurant_revenue_estimator.engine.scenario import (
     compare_assumption_sets,
     sensitivity,
 )
+from restaurant_revenue_estimator.engine.scenario import scenario as scenario_module
 from restaurant_revenue_estimator.report import result_to_dict
-from restaurant_revenue_estimator.services.evaluation import EvaluationRequest, evaluate
+from restaurant_revenue_estimator.services.evaluation import (
+    EvaluationRequest,
+    EvaluationResult,
+    evaluate,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
@@ -192,4 +198,41 @@ def test_tc_f3_01() -> None:
         DATA, EvaluationRequest(store_id="birdman_tamachi", replications=5)
     )
     assert res20 == res5
+
+
+def test_tc_42_09_sensitivity_evaluates_single_variant_per_row(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recorded: list[tuple[dict[str, Any] | None, int]] = []
+    original_evaluate = scenario_module.evaluate
+
+    def recording_evaluate(
+        data_dir: Path, request: EvaluationRequest
+    ) -> list[EvaluationResult]:
+        results = original_evaluate(data_dir, request)
+        recorded.append((request.overrides, len(results)))
+        return results
+
+    monkeypatch.setattr(
+        "restaurant_revenue_estimator.engine.scenario.scenario.evaluate",
+        recording_evaluate,
+    )
+
+    req = EvaluationRequest(store_id="birdman_tamachi", replications=1)
+    sensitivity(DATA, req)
+
+    assert len(recorded) > 1, "評価が実行されていること"
+    # baseline の 1 回目と、overrides の layout.floor2 が
+    # 2 階の候補名を振っている行を除いて、件数がすべて 1 であること
+    remaining = [
+        item
+        for item in recorded[1:]
+        if not (item[0] and set(item[0].keys()) == {"layout.floor2"})
+    ]
+    assert remaining, "行ごとの評価が記録されていること"
+    assert all(count == 1 for _, count in remaining), (
+        "2 階の候補固定により行ごとの件数は 1 であるべき: "
+        f"{[c for _, c in remaining if c != 1]}"
+    )
+
 

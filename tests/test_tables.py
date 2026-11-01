@@ -211,3 +211,59 @@ def test_wait_limit_makes_group_leave() -> None:
     )
     assert result.lost_by_reason.get("wait_timeout") == 2
     assert (11, 2, "1f") not in result.seating_events
+
+
+def test_tc_42_10_record_series_controls_series_recording() -> None:
+    rate = [1.0] * 18
+    res_true = simulate(
+        TABLES,
+        SimulationConfig(close_minute=150, last_entry_minute=120),
+        arrival_rate=rate,
+        seed=42,
+        record_series=True,
+    )
+    res_false = simulate(
+        TABLES,
+        SimulationConfig(close_minute=150, last_entry_minute=120),
+        arrival_rate=rate,
+        seed=42,
+        record_series=False,
+    )
+
+    # 系列以外の項目がすべて一致
+    assert res_false.entered_guests == res_true.entered_guests
+    assert res_false.entered_groups == res_true.entered_groups
+    assert res_false.lost_guests == res_true.lost_guests
+    assert res_false.lost_groups == res_true.lost_groups
+    assert res_false.lost_by_reason == res_true.lost_by_reason
+    assert res_false.lost_groups_by_reason == res_true.lost_groups_by_reason
+    assert res_false.entered_by_floor == res_true.entered_by_floor
+    assert res_false.seating_events == res_true.seating_events
+    assert res_false.seat_minutes == res_true.seat_minutes
+    assert res_false.seat_capacity_minutes == res_true.seat_capacity_minutes
+    assert res_false.seat_utilization == res_true.seat_utilization
+
+    # False のときは 4 つの系列が空であること
+    assert res_false.queue_people == ()
+    assert res_false.queue_groups == ()
+    assert res_false.occupied_people == ()
+    assert all(series == () for series in res_false.occupied_tables_by_floor.values())
+
+    # True のときは系列が記録されていること
+    assert len(res_true.queue_people) > 0
+    assert len(res_true.queue_groups) > 0
+    assert len(res_true.occupied_people) > 0
+    assert any(len(series) > 0 for series in res_true.occupied_tables_by_floor.values())
+
+
+def test_tc_42_15_tables_on_unconfigured_floors_do_not_raise() -> None:
+    tables = [Table("1f-1", 4, "1f"), Table("2f-1", 4, "2f")]
+    config = SimulationConfig(
+        floors=(Floor("1f", "always"),),
+        close_minute=60,
+        last_entry_minute=50,
+    )
+    result = simulate(tables, config)
+    assert result.entered_guests == 0
+
+
