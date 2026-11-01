@@ -61,8 +61,7 @@ def load_holidays(csv_path: Path, meta_path: Path, year: int) -> dict[date, str]
     """内閣府 CSV を読む. sha256 と年を検査する."""
     raw = csv_path.read_bytes()
     meta = (
-        yaml.load(meta_path.read_text(encoding="utf-8"), Loader=yaml.CSafeLoader)
-        or {}
+        yaml.load(meta_path.read_text(encoding="utf-8"), Loader=yaml.CSafeLoader) or {}
     )
     expected = meta.get("sha256")
     actual = hashlib.sha256(raw).hexdigest()
@@ -337,6 +336,7 @@ def calendars_for_store(
     mode: str,
     holidays: dict[date, str],
     saturday_closure_start: str | None = None,
+    saturday_hours_candidate: str | None = None,
 ) -> list[CalendarSeries]:
     """StoreInputs から営業日系列を作る."""
     operations = inputs.files.get("operations.yaml", {}) or {}
@@ -349,9 +349,12 @@ def calendars_for_store(
         raw_hours = (operations.get("saturday_hours_before_closure") or {}).get(
             "candidates"
         ) or {}
-        saturday_hours = raw_hours.get("same_as_weekday") or next(
-            iter(raw_hours.values()), None
-        )
+        if saturday_hours_candidate is not None:
+            saturday_hours = raw_hours.get(saturday_hours_candidate)
+        else:
+            saturday_hours = raw_hours.get("same_as_weekday") or next(
+                iter(raw_hours.values()), None
+            )
     if saturday_closure_start:
         candidates = {"selected": date.fromisoformat(saturday_closure_start)}
     elif mode == "historical":

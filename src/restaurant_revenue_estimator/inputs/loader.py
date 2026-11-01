@@ -2,7 +2,9 @@
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -181,6 +183,179 @@ def _related_source_issues(inputs: StoreInputs) -> list[ValidationIssue]:
     return issues
 
 
+def _validate_late_night_premium(entry: ValueEntry) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    reason_msg = "late_night_premium は 1.25 以上（深夜割増 25% 以上）"
+    if entry.value.value is not None:
+        try:
+            if Decimal(str(entry.value.value)) < Decimal("1.25"):
+                issues.append(
+                    ValidationIssue(file=entry.file, path=entry.path, reason=reason_msg)
+                )
+        except (ValueError, ArithmeticError):
+            issues.append(
+                ValidationIssue(
+                    file=entry.file,
+                    path=entry.path,
+                    reason="late_night_premium の値が数値ではない",
+                )
+            )
+    if isinstance(entry.value.range, dict):
+        for rk, rval in entry.value.range.items():
+            if rval is not None:
+                try:
+                    if Decimal(str(rval)) < Decimal("1.25"):
+                        issues.append(
+                            ValidationIssue(
+                                file=entry.file,
+                                path=f"{entry.path}.range.{rk}",
+                                reason=reason_msg,
+                            )
+                        )
+                except (ValueError, ArithmeticError):
+                    pass
+    return issues
+
+
+VALID_WEEKDAYS: frozenset[str] = frozenset(
+    {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
+)
+REQUIRED_SHIFT_FIELDS: tuple[str, ...] = (
+    "id",
+    "weekdays",
+    "service",
+    "start",
+    "end",
+    "heads",
+    "hourly_wage",
+)
+TIME_PATTERN = re.compile(r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
+
+
+def _check_time_and_heads(shift_id: str, shift: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    for tf in ("start", "end"):
+        if tf in shift:
+            tval = str(shift[tf])
+            if not TIME_PATTERN.match(tval):
+                errors.append(
+                    f"シフト '{shift_id}': {tf} は HH:MM 形式（00:00〜23:59）"
+                    f"である必要があります（指定値: '{tval}'）"
+                )
+    if "heads" in shift:
+        heads = shift["heads"]
+        if isinstance(heads, bool) or not isinstance(heads, int) or heads < 0:
+            errors.append(
+                f"シフト '{shift_id}': heads は 0 以上の整数である必要があります"
+                f"（指定値: '{heads}'）"
+            )
+    return errors
+
+
+def _check_wage_and_service(shift_id: str, shift: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    if "service" in shift:
+        svc = shift["service"]
+        if svc not in ("lunch", "dinner"):
+            errors.append(
+                f"シフト '{shift_id}': service は 'lunch' または 'dinner' のみ"
+                f"（指定値: '{svc}'）"
+            )
+    if "hourly_wage" in shift:
+        wage_raw = shift["hourly_wage"]
+        try:
+            wage = Decimal(str(wage_raw))
+            if wage.is_nan() or wage.is_infinite() or wage <= 0:
+                raise ValueError
+        except (ValueError, ArithmeticError, TypeError):
+            errors.append(
+                f"シフト '{shift_id}': hourly_wage は 0 より大きい有限の数値"
+                f"である必要があります（指定値: '{wage_raw}'）"
+            )
+    return errors
+
+
+def _validate_single_shift(idx: int, shift: Any, seen_ids: set[str]) -> list[str]:
+    if not isinstance(shift, dict):
+        return [f"シフト要素 [{idx}] は辞書である必要があります"]
+
+    errors: list[str] = []
+    shift_id = str(shift.get("id") or f"[{idx}]")
+
+    for req_field in REQUIRED_SHIFT_FIELDS:
+        if req_field not in shift:
+            errors.append(
+                f"シフト '{shift_id}': 必須フィールド '{req_field}' がありません"
+            )
+
+    if "id" in shift:
+        sid = str(shift["id"])
+        if sid in seen_ids:
+            errors.append(f"シフト id '{sid}' が重複しています")
+        else:
+            seen_ids.add(sid)
+
+    if "weekdays" in shift:
+        wds = shift["weekdays"]
+        if not isinstance(wds, (list, tuple, set)) or not wds:
+            errors.append(
+                f"シフト '{shift_id}': weekdays は曜日のリストである必要があります"
+            )
+        else:
+            for wd in wds:
+                if wd not in VALID_WEEKDAYS:
+                    errors.append(
+                        f"シフト '{shift_id}': 不正な曜日 '{wd}' "
+                        f"(mon, tue, wed, thu, fri, sat, sun のいずれか)"
+                    )
+
+    errors.extend(_check_time_and_heads(shift_id, shift))
+    errors.extend(_check_wage_and_service(shift_id, shift))
+    return errors
+
+
+def validate_shift_specs(shifts: Any) -> list[str]:
+    """シフト仕様のリストを検査し、問題の文言のリストを返す純粋関数."""
+    if not isinstance(shifts, list):
+        return ["part_time_shifts はリストである必要があります"]
+
+    errors: list[str] = []
+    seen_ids: set[str] = set()
+    for idx, shift in enumerate(shifts):
+        errors.extend(_validate_single_shift(idx, shift, seen_ids))
+    return errors
+
+
+def _validate_part_time_shifts(entry: ValueEntry) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    shift_groups: list[tuple[str, Any]] = [("", entry.value.value)]
+    if isinstance(entry.value.range, dict):
+        for rk, rshifts in entry.value.range.items():
+            shift_groups.append((f".range.{rk}", rshifts))
+    for sub_path, shifts in shift_groups:
+        for err in validate_shift_specs(shifts):
+            issues.append(
+                ValidationIssue(
+                    file=entry.file,
+                    path=f"{entry.path}{sub_path}",
+                    reason=err,
+                )
+            )
+    return issues
+
+
+def _validate_labor_shifts_and_premium(
+    inputs: StoreInputs,
+) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    for entry in inputs.values:
+        if entry.path == "late_night_premium":
+            issues.extend(_validate_late_night_premium(entry))
+        elif entry.path == "part_time_shifts":
+            issues.extend(_validate_part_time_shifts(entry))
+    return issues
+
+
 def validate_store(directory: Path) -> list[ValidationIssue]:
     """1 店舗分を検査する."""
     try:
@@ -213,6 +388,7 @@ def validate_store(directory: Path) -> list[ValidationIssue]:
         )
 
     issues.extend(_related_source_issues(inputs))
+    issues.extend(_validate_labor_shifts_and_premium(inputs))
     return issues
 
 
