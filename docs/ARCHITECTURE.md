@@ -130,7 +130,9 @@ data/
 | テーブル | 列 | 用途 |
 |---|---|---|
 | `scenarios` | id, store_id, name, base_assumption_set, overrides_json, note, created_at, updated_at | 画面で変えた仮定のまとまり |
-| `runs` | id, store_id, scenario_id, assumption_set, calendar_mode, year, seed, replications, input_hash, model_version, calendar_sha256, created_at, result_json | 1 回の評価の記録 |
+| `runs` | id, store_id, scenario_id, assumption_set, calendar_mode, year, seed, replications, input_hash, model_version, code_sha256, calendar_sha256, created_at, result_json | 1 回の評価の記録 |
+
+`result_json` の最上位は `variants`（未確定の候補ごとの結果）と `scenarios`（悲観・標準・楽観 × 候補の年間売上・事業所得相当）。売上・損益・卓シミュレーション・日別の売上・昼の着席人数の時系列・人件費の内訳・費用の内訳に使った値・最低賃金の警告は、各 variant の中にある。#32 より前に保存した run は `variants` を持たず、画面は最上位の中身を 1 件の候補として読む。
 
 シナリオ上書きのルール:
 
@@ -174,6 +176,7 @@ data/
 - 需要 = 曜日ベース × 月の季節係数 × 特定日の効果（spec 6.6）
 - コース客の比率 = ロジスティック（月・曜日・人数）。コース客とアラカルト客は排他
 - 団体予約は複数卓を 120／150 分のブロックで確保する（卓シミュレーションの予約）
+- 夜の客数も卓シミュレーションに通し、卓が足りずに入れなかった分を失った需要として出す（[ADR 0005](adr/0005-dinner-through-table-simulation.md)）
 - 予約画面の「×」を満席や需要に変換しない（spec T16、T24）
 
 ### 5.5 売上（engine/revenue）
@@ -200,16 +203,23 @@ spec 6.1 の恒等式。守ること:
 | 店主の労働対価（別列） | 店主の労働時間 × 仮想時給。事業所得相当と合算して表示しない |
 | CF | 事業所得相当 + 減価償却 − 借入元本返済 − 設備投資 |
 
-人件費: 正社員（職種別のユニーク人数 × 月給）＋ アルバイト（シフト表 × 時給、22:00〜5:00 は 25% 以上の割増）＋ 賞与・法定福利・通勤費。付帯費率を一括で足す場合は個別積算と二重にしない（spec T09、T10）。時給が東京都最低賃金（2026-10-01 から 1,280 円）を下回る入力は警告する。
+人件費: 正社員（職種別のユニーク人数 × 月給）＋ アルバイト（仮定 `part_time_shifts` のシフト表 × 時給、22:00〜5:00 は 25% 以上の割増）＋ 賞与・法定福利・通勤費。付帯費率を一括で足す場合は個別積算と二重にしない（spec T09、T10）。
 
-公庫の経営指標（酒場・ビヤホール）は入力に使わない。推計結果を公庫の定義（税込売上が分母、人件費に経営者報酬を含む）に換算して比べる照合だけに使う（[ADR 0004](adr/0004-jfc-ratios-as-benchmark-only.md)、FND-9）。
+- アルバイトのシフトは、営業日ごとに曜日と営業サービスで絞って数える（昼が休みの日は昼のシフトを数えない）
+- 法定福利は（正社員の給与 ＋ 賞与 ＋ アルバイトの賃金）× 率。通勤費には掛けない
+- 最低賃金は数えたシフトの日付ごとに比べ、下回るシフトを警告にする（東京都は 2026-10-01 から 1,280 円）
+- 原価は「アラカルト（お通しを含む）の税抜 × 原価率 ＋ コースの税抜 × 原価率」
+- 損益は月ごとに作る。各月の費用（人件費の 5 つの内訳・原価・固定費）を円に丸めてから月の損益を作り、年の値はその和にする（[ADR 0006](adr/0006-labor-from-shifts-and-monthly-pnl.md)）
+
+公庫の経営指標（酒場・ビヤホール）は入力に使わない。推計結果を公庫の定義（税込売上が分母、人件費に経営者報酬を含む）に換算して比べる照合だけに使う（[ADR 0004](adr/0004-jfc-ratios-as-benchmark-only.md)、FND-9）。照合の計算は `engine/pnl` の `jfc_comparison`・`jfc_benchmark_rows` で行い、公庫の値は `data/benchmarks/jfc_2025_izakaya.yaml` から読む。
 
 税引後の手取り（所得税・住民税・事業税）は MVP の対象外。
 
 ### 5.7 シナリオと感度（engine/scenario）
 
-- 悲観／標準／楽観の 3 つの仮定セットで全計算を回す
-- 感度: ASSUMPTION と UNRESOLVED の各入力を 1 つずつ low/high（UNRESOLVED は各候補）に振り、年間売上と事業所得相当の振れ幅で並べる。上位から「次に調べるべきもの」として出す（spec 1.1-7、12 章）
+- 1 回の実行（`services/evaluation.py` の `evaluate_run`）で、未確定の候補の組合せをすべて計算し、悲観／標準／楽観の 3 つの仮定セットを同じ seed・replications で回す（[ADR 0008](adr/0008-all-variants-and-three-scenarios-per-run.md)）
+  - steady は 2 階の候補（バードマン 3 通り）、historical は 2 階 × 土曜定休の開始日 × 土曜の営業時間（バードマン 12 通り）。上書きで固定した軸は振らない
+- 感度: ASSUMPTION と UNRESOLVED の各入力を 1 つずつ low/high（UNRESOLVED は各候補）に振り、年間売上と事業所得相当の振れ幅で並べる。上位から「次に調べるべきもの」として出す（spec 1.1-7、12 章）。行ごとに、基準の候補の 3 つの軸をすべて固定して 1 候補だけを計算する
 - 相関付きモンテカルロと P10–P90 表示は、実績で校正できるまで出さない（spec 6.10）
 
 ## 6. 出力
@@ -262,7 +272,9 @@ API（画面から呼ぶ）:
 | GET / POST | `/api/stores/{id}/scenarios` | シナリオ一覧・作成 |
 | GET / PUT / DELETE | `/api/scenarios/{id}` | シナリオの参照・更新・削除 |
 
-同じ入力ハッシュ・seed・replications の実行結果は `runs` から返す（再計算しない）。
+同じ入力ハッシュ・seed・replications・計算コードのハッシュの実行結果は `runs` から返す（再計算しない。[ADR 0007](adr/0007-code-hash-in-run-reuse.md)）。
+
+画面は `?variant=` で表示する候補を切り替える。表を組み立てる処理（税抜の配分・年の行の和・費用の内訳の取り出し）は `services/screens.py` に置き、routes には計算を書かない。
 
 ## 7. どこを触れば何が変わるか
 
@@ -275,6 +287,10 @@ API（画面から呼ぶ）:
 | 損益の段階・費目 | `src/restaurant_revenue_estimator/engine/pnl/`、`engine/cost/` |
 | レポートの章立て・表示ルール | `src/restaurant_revenue_estimator/report/` |
 | 画面 | `src/restaurant_revenue_estimator/routes/`、`templates/` |
+| 画面の表の組み立て（税抜の配分・日別の表・費用の内訳） | `src/restaurant_revenue_estimator/services/screens.py` |
+| 候補の組合せ・3 シナリオ・1 回の実行の結果の形 | `src/restaurant_revenue_estimator/services/evaluation.py`（`evaluate_run`） |
+| 人件費のシフト・最低賃金の警告・月次の損益 | `src/restaurant_revenue_estimator/engine/cost/`、`engine/pnl/` |
+| テストで評価結果を使い回す対象のファイル | `tests/eval_cache.py` の `TARGET_FILES`・`EXCLUDED_TESTS`（[ADR 0009](adr/0009-reuse-evaluations-in-tests.md)） |
 
 ## 8. MVP の対象外
 
