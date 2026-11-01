@@ -582,4 +582,63 @@ def test_tc_42_12_evaluation_deterministic_across_cleared_cache() -> None:
     assert first == second
 
 
+def test_tc_42_13_group_distribution_order_sensitivity() -> None:
+    clear_dinner_day_cache()
+    tables = [Table("t1", 4, "1f")]
+    base_kwargs: dict[str, Any] = {
+        "tables": tables,
+        "desired_guests": 40,
+        "course_ratio": 0.0,
+        "courses": {},
+        "seed": 1,
+    }
+    simulate_dinner_day(
+        **base_kwargs,
+        dinner_group_size_distribution={1: 0.5, 4: 0.5},
+    )
+    res_second = simulate_dinner_day(
+        **base_kwargs,
+        dinner_group_size_distribution={4: 0.5, 1: 0.5},
+    )
+
+    clear_dinner_day_cache()
+    res_isolated = simulate_dinner_day(
+        **base_kwargs,
+        dinner_group_size_distribution={4: 0.5, 1: 0.5},
+    )
+
+    assert res_second == res_isolated
+
+
+def test_tc_42_14_none_seed_never_cached(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clear_dinner_day_cache()
+
+    call_count = 0
+    orig_sim_rep = dinner_module._simulate_one_replication
+
+    def counting_sim_rep(*args: Any, **kwargs: Any) -> Any:
+        nonlocal call_count
+        call_count += 1
+        return orig_sim_rep(*args, **kwargs)
+
+    monkeypatch.setattr(dinner_module, "_simulate_one_replication", counting_sim_rep)
+
+    tables = [Table("t1", 4, "1f")]
+    kwargs: dict[str, Any] = {
+        "tables": tables,
+        "desired_guests": 20,
+        "course_ratio": 0.0,
+        "courses": {},
+        "seed": None,
+    }
+
+    simulate_dinner_day(**kwargs)
+    assert call_count == 1
+    simulate_dinner_day(**kwargs)
+    assert call_count == 2
+
+
+
 

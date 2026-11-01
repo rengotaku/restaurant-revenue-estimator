@@ -2,6 +2,7 @@
 
 import copy
 import math
+import threading
 from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -558,17 +559,19 @@ def _simulate_one_replication(
 
 _DINNER_DAY_CACHE_MAXSIZE = 8192
 _dinner_day_cache: OrderedDict[tuple[Any, ...], DinnerDayResult] = OrderedDict()
+_dinner_day_cache_lock = threading.Lock()
 
 
 def clear_dinner_day_cache() -> None:
     """simulate_dinner_day のキャッシュをクリアする."""
-    _dinner_day_cache.clear()
+    with _dinner_day_cache_lock:
+        _dinner_day_cache.clear()
 
 
 def _freeze_dict(d: dict[Any, Any] | None) -> tuple[tuple[Any, Any], ...] | None:
     if d is None:
         return None
-    return tuple(sorted(d.items()))
+    return tuple(d.items())
 
 
 def _make_dinner_day_cache_key(
@@ -595,9 +598,7 @@ def _make_dinner_day_cache_key(
     walk_in_arrivals: Sequence[Arrival] | None,
 ) -> tuple[Any, ...]:
     if isinstance(course_start_window, dict):
-        frozen_window: tuple[Any, ...] | None = tuple(
-            sorted(course_start_window.items())
-        )
+        frozen_window: tuple[Any, ...] | None = tuple(course_start_window.items())
     elif isinstance(course_start_window, (tuple, list)):
         frozen_window = tuple(course_start_window)
     else:
@@ -608,7 +609,7 @@ def _make_dinner_day_cache_key(
         tuple(floors),
         desired_guests,
         course_ratio,
-        tuple(sorted(courses.items())),
+        tuple(courses.items()),
         dinner_stay_minutes,
         dinner_peak_share,
         _freeze_dict(dinner_group_size_distribution),
@@ -628,7 +629,7 @@ def _make_dinner_day_cache_key(
     )
 
 
-def simulate_dinner_day(  # noqa: PLR0915
+def simulate_dinner_day(  # noqa: PLR0912, PLR0915
     *,
     tables: Sequence[Table],
     floors: Sequence[Floor] = (),
@@ -660,33 +661,40 @@ def simulate_dinner_day(  # noqa: PLR0915
     if not (0.0 <= course_ratio <= 1.0) or not math.isfinite(course_ratio):
         raise ValueError("course_ratio は 0〜1")
 
-    cache_key = _make_dinner_day_cache_key(
-        tables=tables,
-        floors=floors,
-        desired_guests=desired_guests,
-        course_ratio=course_ratio,
-        courses=courses,
-        dinner_stay_minutes=dinner_stay_minutes,
-        dinner_peak_share=dinner_peak_share,
-        dinner_group_size_distribution=dinner_group_size_distribution,
-        course_party_size_distribution=course_party_size_distribution,
-        course_start_window=course_start_window,
-        course_extension_rate=course_extension_rate,
-        can_extend_today=can_extend_today,
-        cleanup_minutes=cleanup_minutes,
-        max_wait_minutes=max_wait_minutes,
-        open_minute=open_minute,
-        last_entry_minute=last_entry_minute,
-        close_minute=close_minute,
-        open_clock=open_clock,
-        replications=replications,
-        seed=seed,
-        walk_in_arrivals=walk_in_arrivals,
-    )
+    cache_key: tuple[Any, ...] | None = None
+    if seed is not None:
+        cache_key = _make_dinner_day_cache_key(
+            tables=tables,
+            floors=floors,
+            desired_guests=desired_guests,
+            course_ratio=course_ratio,
+            courses=courses,
+            dinner_stay_minutes=dinner_stay_minutes,
+            dinner_peak_share=dinner_peak_share,
+            dinner_group_size_distribution=dinner_group_size_distribution,
+            course_party_size_distribution=course_party_size_distribution,
+            course_start_window=course_start_window,
+            course_extension_rate=course_extension_rate,
+            can_extend_today=can_extend_today,
+            cleanup_minutes=cleanup_minutes,
+            max_wait_minutes=max_wait_minutes,
+            open_minute=open_minute,
+            last_entry_minute=last_entry_minute,
+            close_minute=close_minute,
+            open_clock=open_clock,
+            replications=replications,
+            seed=seed,
+            walk_in_arrivals=walk_in_arrivals,
+        )
 
-    if cache_key in _dinner_day_cache:
-        _dinner_day_cache.move_to_end(cache_key)
-        return copy.deepcopy(_dinner_day_cache[cache_key])
+        cached_result: DinnerDayResult | None = None
+        with _dinner_day_cache_lock:
+            if cache_key in _dinner_day_cache:
+                _dinner_day_cache.move_to_end(cache_key)
+                cached_result = _dinner_day_cache[cache_key]
+
+        if cached_result is not None:
+            return copy.deepcopy(cached_result)
 
     walk_in_group_dist = dinner_group_size_distribution or {
         1: 0.15,
@@ -790,8 +798,12 @@ def simulate_dinner_day(  # noqa: PLR0915
         lost_by_reason=avg_lost_by_reason,
         reservations=first_reservations,
     )
-    _dinner_day_cache[cache_key] = result
-    if len(_dinner_day_cache) > _DINNER_DAY_CACHE_MAXSIZE:
-        _dinner_day_cache.popitem(last=False)
-    return copy.deepcopy(result)
+    if cache_key is not None:
+        with _dinner_day_cache_lock:
+            _dinner_day_cache[cache_key] = result
+            if len(_dinner_day_cache) > _DINNER_DAY_CACHE_MAXSIZE:
+                _dinner_day_cache.popitem(last=False)
+        return copy.deepcopy(result)
+
+    return result
 

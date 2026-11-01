@@ -145,7 +145,8 @@ def simulate(  # noqa: PLR0912, PLR0915
         floor_id: [
             t
             for t in tables
-            if floor_idx[t.floor] < floor_idx[floor_id]
+            if t.floor in floor_idx
+            and floor_idx[t.floor] < floor_idx[floor_id]
             and floor_policy.get(t.floor, "always") != "never"
         ]
         for floor_id in active_floors

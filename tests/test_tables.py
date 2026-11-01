@@ -255,3 +255,15 @@ def test_tc_42_10_record_series_controls_series_recording() -> None:
     assert len(res_true.occupied_people) > 0
     assert any(len(series) > 0 for series in res_true.occupied_tables_by_floor.values())
 
+
+def test_tc_42_15_tables_on_unconfigured_floors_do_not_raise() -> None:
+    tables = [Table("1f-1", 4, "1f"), Table("2f-1", 4, "2f")]
+    config = SimulationConfig(
+        floors=(Floor("1f", "always"),),
+        close_minute=60,
+        last_entry_minute=50,
+    )
+    result = simulate(tables, config)
+    assert result.entered_guests == 0
+
+
