@@ -1,5 +1,6 @@
 """昼のモデル: 到着率を作り、卓シミュレーションを replications 回す."""
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from restaurant_revenue_estimator.engine.tables import (
@@ -17,6 +18,25 @@ class LunchDayResult:
     lost: float
     peak_queue: float
     results: tuple[SimulationResult, ...]
+    occupied_people: tuple[float, ...] = ()
+
+
+def lunch_occupancy_stats(
+    occupied_people: Sequence[float],
+) -> tuple[float, float]:
+    """Return (max_occupancy, avg_12_13).
+
+    Assuming lunch starts at 11:30 (minute 0).
+    12:00 is minute 30, 13:00 is minute 90.
+    """
+    if not occupied_people:
+        return 0.0, 0.0
+    max_val = max(occupied_people)
+    start_idx = 30
+    end_idx = min(91, len(occupied_people))
+    slice_12_13 = occupied_people[start_idx:end_idx]
+    avg_12_13 = sum(slice_12_13) / len(slice_12_13) if slice_12_13 else 0.0
+    return max_val, avg_12_13
 
 
 def arrival_profile(
@@ -76,9 +96,15 @@ def simulate_lunch_day(
         for index in range(replications)
     ]
     count = len(results) or 1
+    series_len = len(results[0].occupied_people) if results else 0
+    occupied_avg = tuple(
+        sum(r.occupied_people[m] for r in results) / count
+        for m in range(series_len)
+    )
     return LunchDayResult(
         guests=sum(result.entered_guests for result in results) / count,
         lost=sum(result.lost_guests for result in results) / count,
         peak_queue=sum(result.max_queue_people() for result in results) / count,
         results=tuple(results),
+        occupied_people=occupied_avg,
     )

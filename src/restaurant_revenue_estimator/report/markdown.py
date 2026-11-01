@@ -5,7 +5,7 @@ from typing import Any
 
 import yaml
 
-from restaurant_revenue_estimator.engine.pnl import jfc_comparison
+from restaurant_revenue_estimator.engine.pnl import jfc_benchmark_rows
 from restaurant_revenue_estimator.engine.scenario import SensitivityRow
 from restaurant_revenue_estimator.evidence.models import ProvenancedValue
 from restaurant_revenue_estimator.inputs import StoreInputs
@@ -20,13 +20,39 @@ TEN = 1.1
 
 def result_to_dict(result: EvaluationResult) -> dict[str, Any]:
     pnl = result.pnl
+    days_data = [
+        {
+            "date": day.day.isoformat(),
+            "lunch": day.lunch.total_inc_tax,
+            "dinner": day.dinner.total_inc_tax,
+            "ala": day.lunch.ala_revenue + day.dinner.ala_revenue,
+            "course": day.lunch.course_revenue + day.dinner.course_revenue,
+            "appetizer": day.lunch.appetizer_revenue + day.dinner.appetizer_revenue,
+            "other": day.lunch.other_revenue + day.dinner.other_revenue,
+            "total": day.total_inc_tax,
+        }
+        for day in getattr(result, "days", ())
+    ]
+    physical_seats = sum(table.seats for table in result.tables)
+    occupied_list = list(getattr(result, "occupied_people", ()))
+    max_occ = getattr(result, "lunch_occupancy_max", 0.0)
+    avg_occ_12_13 = getattr(result, "lunch_occupancy_12_13_avg", 0.0)
+    wd_used = getattr(result, "lunch_weekday_used", "月曜")
     return {
         "store_id": result.store_id,
         "variant": result.variant,
+        "name": result.variant,
         "year": result.year,
         "calendar_mode": result.calendar_mode,
         "assumption_set": result.assumption_set,
         "open_days": result.open_days,
+        "days": days_data,
+        "physical_seats": physical_seats,
+        "occupied_people": occupied_list,
+        "lunch_occupancy_max": max_occ,
+        "lunch_occupancy_12_13_avg": avg_occ_12_13,
+        "lunch_weekday_used": wd_used,
+        "cost_breakdown": getattr(result, "cost_breakdown", None),
         "revenue": {
             "total_inc_tax": result.revenue.total_inc_tax,
             "total_ex_tax": result.revenue.total_ex_tax,
@@ -34,6 +60,7 @@ def result_to_dict(result: EvaluationResult) -> dict[str, Any]:
             "dinner_inc_tax": result.revenue.dinner_inc_tax,
             "ala_inc_tax": result.revenue.ala_inc_tax,
             "course_inc_tax": result.revenue.course_inc_tax,
+            "days": days_data,
             "months": [
                 {
                     "year": month.year,
@@ -53,6 +80,11 @@ def result_to_dict(result: EvaluationResult) -> dict[str, Any]:
         "simulation": {
             "lunch_guests_by_weekday": result.lunch_guests_by_weekday,
             "lost_lunch_guests": result.lost_lunch_guests,
+            "physical_seats": physical_seats,
+            "occupied_people": occupied_list,
+            "lunch_occupancy_max": max_occ,
+            "lunch_occupancy_12_13_avg": avg_occ_12_13,
+            "lunch_weekday_used": wd_used,
             "dinner_desired_guests": result.dinner_desired_guests,
             "dinner_guests": result.dinner_guests,
             "dinner_lost_guests": result.dinner_lost_guests,
@@ -134,9 +166,30 @@ def _value_lines(inputs: StoreInputs) -> list[str]:
     lines = []
     for entry in inputs.values:
         value = entry.value
-        source_text = ", ".join(value.sources) if value.sources else "—"
+        status_str = value.status.value
+        if status_str == "ASSUMPTION":
+            url_text = "—"
+            date_text = "—"
+            note_text = value.justification or value.note or ""
+        else:
+            urls = []
+            dates = []
+            for source_id in value.sources:
+                source = inputs.sources.get(source_id)
+                if source:
+                    urls.append(source.url)
+                    if source.accessed_at:
+                        dates.append(source.accessed_at.isoformat())
+                    else:
+                        dates.append("—")
+                else:
+                    urls.append(source_id)
+                    dates.append("—")
+            url_text = ", ".join(urls) if urls else "—"
+            date_text = ", ".join(dates) if dates else "—"
+            note_text = value.note or ""
         lines.append(
-            f"| `{entry.path}` | {value.status.value} | {_display(value)} | {source_text} | {value.note or ''} |"
+            f"| `{entry.path}` | {status_str} | {_display(value)} | {url_text} | {date_text} | {note_text} |"
         )
     return lines
 
@@ -167,6 +220,39 @@ def _related_note(inputs: StoreInputs) -> str:
     if not names:
         return "姉妹店の混入は無い。"
     return f"姉妹店（{'、'.join(names)}）を含めていない。"
+
+
+def _external_url_lines(inputs: StoreInputs) -> list[str]:
+    store = inputs.files.get("store.yaml", {}) or {}
+    lines = []
+    official_url = plain(store.get("official_url") or store.get("url"))
+    if official_url:
+        lines.append(f"- 公式 URL: {official_url}")
+
+    external_ids = store.get("external_ids", {}) or {}
+    for name, item in external_ids.items():
+        val = str(plain(item))
+        url = None
+        if isinstance(item, dict) and item.get("sources"):
+            for sid in item.get("sources", []):
+                src = inputs.sources.get(sid)
+                if src and src.url:
+                    url = src.url
+                    break
+        if not url:
+            for src in inputs.sources.values():
+                if name in src.url and val in src.url:
+                    url = src.url
+                    break
+        if not url and name == "tabelog":
+            for src in inputs.sources.values():
+                if "tabelog.com" in src.url and val in src.url:
+                    url = src.url
+                    break
+        if url:
+            label = "食べログ" if name == "tabelog" else name
+            lines.append(f"- {label}: {url}")
+    return lines
 
 
 def _sales_status(
@@ -220,17 +306,17 @@ def _render_variant_revenue(
         lines.extend([f"### {result.variant}", ""])
     lines.extend(
         [
-            "| 月 | 昼（税込） | 夜（税込） | 合計（税込） | 税抜 |",
-            "|---|---:|---:|---:|---:|",
+            "| 月 | ステータス | 昼（税込） | 夜（税込） | 合計（税込） | 税抜 |",
+            "|---|---|---:|---:|---:|---:|",
         ]
     )
     for month in result.revenue.months:
         lines.append(
-            f"| {month.month} 月 | {_yen(month.lunch_inc_tax)} | {_yen(month.dinner_inc_tax)} | "
+            f"| {month.month} 月 | DERIVED | {_yen(month.lunch_inc_tax)} | {_yen(month.dinner_inc_tax)} | "
             f"{_yen(month.total_inc_tax)} | {_yen(month.total_ex_tax)} |"
         )
     lines.append(
-        f"| 年 | {_yen(result.revenue.lunch_inc_tax)} | {_yen(result.revenue.dinner_inc_tax)} | "
+        f"| 年 | DERIVED | {_yen(result.revenue.lunch_inc_tax)} | {_yen(result.revenue.dinner_inc_tax)} | "
         f"{_yen(result.revenue.total_inc_tax)} | {_yen(result.revenue.total_ex_tax)} |"
     )
     lines.append("")
@@ -318,19 +404,12 @@ def _render_benchmark_section(
         lines.append(f"- 定義: {definition}")
         lines.append("- 売上は税込、人件費に店主の労働対価を含めて換算した。")
         lines.append("")
-        comparison = jfc_comparison(pnl)
-        lines.append("| 指標 | 推計 | 公庫平均 |")
-        lines.append("|---|---:|---:|")
-        metrics = benchmark.get("metrics", {})
-        lines.append(
-            f"| 総利益率 | {comparison.gross_profit_ratio:.1%} | {metrics.get('gross_profit_ratio', {}).get('average', '—')} |"
-        )
-        lines.append(
-            f"| 人件費率 | {comparison.labor_ratio:.1%} | {metrics.get('labor_ratio', {}).get('average', '—')} |"
-        )
-        lines.append(
-            f"| 営業利益率 | {comparison.operating_margin:.1%} | {metrics.get('operating_margin', {}).get('average', '—')} |"
-        )
+        lines.append("| 指標 | 推計 | 公庫平均 | 黒字企業平均 |")
+        lines.append("|---|---:|---:|---:|")
+        for row in jfc_benchmark_rows(pnl, benchmark, null_label="—"):
+            lines.append(
+                f"| {row.label} | {row.estimate} | {row.average} | {row.profitable_average} |"
+            )
         lines.append("")
         lines.append("外れていても誤りとは扱わない。分母と範囲の定義が違う。")
     else:
@@ -397,6 +476,11 @@ def render_markdown(
             "",
             f"- 店舗: {name}",
             f"- 住所: {plain(store.get('address'))}",
+        ]
+    )
+    lines.extend(_external_url_lines(inputs))
+    lines.extend(
+        [
             f"- 出典の取得日: {oldest} 〜 {newest}",
             f"- {_related_note(inputs)}",
             "",
@@ -431,8 +515,8 @@ def render_markdown(
         [
             "## 8. 根拠一覧",
             "",
-            "| キー | ステータス | 値 | 出典 | 注記 |",
-            "|---|---|---|---|---|",
+            "| キー | ステータス | 値 | 出典 URL | 取得日 | 注記 |",
+            "|---|---|---|---|---|---|",
         ]
     )
     lines.extend(_value_lines(inputs))
@@ -487,6 +571,11 @@ def render_run_markdown(
             "",
             f"- 店舗: {name}",
             f"- 住所: {plain(store.get('address'))}",
+        ]
+    )
+    lines.extend(_external_url_lines(inputs))
+    lines.extend(
+        [
             f"- 出典の取得日: {oldest} 〜 {newest}",
             f"- {_related_note(inputs)}",
             "",
@@ -526,8 +615,8 @@ def render_run_markdown(
         [
             "## 8. 根拠一覧",
             "",
-            "| キー | ステータス | 値 | 出典 | 注記 |",
-            "|---|---|---|---|---|",
+            "| キー | ステータス | 値 | 出典 URL | 取得日 | 注記 |",
+            "|---|---|---|---|---|---|",
         ]
     )
     lines.extend(_value_lines(inputs))

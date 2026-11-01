@@ -8,10 +8,11 @@
     <h1 class="text-2xl font-bold text-gray-800">売上内訳（{{ result.name }}）</h1>
     <div class="flex gap-2 text-sm">
         {% set variant_param = ('&variant=' ~ request.query_params.get('variant')) if request.query_params.get('variant') else '' %}
+        {% set month_param = ('&month=' ~ selected_month) if selected_month else '' %}
         <a class="px-3 py-1 rounded border {% if tax == 'inc' %}bg-blue-600 text-white border-blue-600{% else %}bg-white{% endif %}"
-           href="/stores/{{ store_id }}/revenue?{% if run_id %}run={{ run_id }}&{% endif %}tax=inc{{ variant_param }}">税込</a>
+           href="/stores/{{ store_id }}/revenue?{% if run_id %}run={{ run_id }}&{% endif %}tax=inc{{ variant_param }}{{ month_param }}">税込</a>
         <a class="px-3 py-1 rounded border {% if tax == 'ex' %}bg-blue-600 text-white border-blue-600{% else %}bg-white{% endif %}"
-           href="/stores/{{ store_id }}/revenue?{% if run_id %}run={{ run_id }}&{% endif %}tax=ex{{ variant_param }}">税抜</a>
+           href="/stores/{{ store_id }}/revenue?{% if run_id %}run={{ run_id }}&{% endif %}tax=ex{{ variant_param }}{{ month_param }}">税抜</a>
     </div>
 </div>
 
@@ -59,34 +60,103 @@
                 <th class="px-4 py-3 text-right">夜</th>
                 <th class="px-4 py-3 text-right">アラカルト</th>
                 <th class="px-4 py-3 text-right">コース</th>
+                <th class="px-4 py-3 text-right">お通し</th>
+                {% if has_other %}
+                <th class="px-4 py-3 text-right">その他</th>
+                {% endif %}
                 <th class="px-4 py-3 text-right">合計</th>
             </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
-            {% for month in months %}
-            <tr>
-                <td class="px-4 py-2">{{ month.month }} 月</td>
-                <td class="px-4 py-2 text-right">{{ "{:,}".format(month.lunch_inc_tax) }}</td>
-                <td class="px-4 py-2 text-right">{{ "{:,}".format(month.dinner_inc_tax) }}</td>
-                <td class="px-4 py-2 text-right">{{ "{:,}".format(month.ala_inc_tax) }}</td>
-                <td class="px-4 py-2 text-right">{{ "{:,}".format(month.course_inc_tax) }}</td>
-                <td class="px-4 py-2 text-right font-medium">{{ "{:,}".format(month.total_inc_tax if tax == 'inc' else month.total_ex_tax) }}</td>
+            {% for row in table_rows %}
+            <tr {% if selected_month and row.month == selected_month %}class="bg-blue-50/50"{% endif %}>
+                <td class="px-4 py-2 font-medium">
+                    {% set row_run_param = ('&run=' ~ run_id) if run_id else '' %}
+                    {% set row_tax_param = ('&tax=' ~ tax) if tax else '' %}
+                    {% set row_variant_param = ('&variant=' ~ request.query_params.get('variant')) if request.query_params.get('variant') else '' %}
+                    <a class="text-blue-600 hover:underline"
+                       href="/stores/{{ store_id }}/revenue?month={{ row.month }}{{ row_run_param }}{{ row_variant_param }}{{ row_tax_param }}">
+                        {{ row.month }} 月
+                    </a>
+                </td>
+                <td class="px-4 py-2 text-right">{{ "{:,}".format(row.lunch) }}</td>
+                <td class="px-4 py-2 text-right">{{ "{:,}".format(row.dinner) }}</td>
+                <td class="px-4 py-2 text-right">{{ "{:,}".format(row.ala) }}</td>
+                <td class="px-4 py-2 text-right">{{ "{:,}".format(row.course) }}</td>
+                <td class="px-4 py-2 text-right">{{ "{:,}".format(row.appetizer) }}</td>
+                {% if has_other %}
+                <td class="px-4 py-2 text-right">{{ "{:,}".format(row.other) }}</td>
+                {% endif %}
+                <td class="px-4 py-2 text-right font-medium">{{ "{:,}".format(row.total) }}</td>
             </tr>
             {% endfor %}
         </tbody>
         <tfoot class="bg-gray-50 font-bold">
             <tr>
                 <td class="px-4 py-3">年</td>
-                <td class="px-4 py-3 text-right">{{ "{:,}".format(result.revenue.lunch_inc_tax) }}</td>
-                <td class="px-4 py-3 text-right">{{ "{:,}".format(result.revenue.dinner_inc_tax) }}</td>
-                <td class="px-4 py-3 text-right">{{ "{:,}".format(result.revenue.ala_inc_tax) }}</td>
-                <td class="px-4 py-3 text-right">{{ "{:,}".format(result.revenue.course_inc_tax) }}</td>
-                <td class="px-4 py-3 text-right">{{ "{:,}".format(total) }}</td>
+                <td class="px-4 py-3 text-right">{{ "{:,}".format(year_summary.lunch) }}</td>
+                <td class="px-4 py-3 text-right">{{ "{:,}".format(year_summary.dinner) }}</td>
+                <td class="px-4 py-3 text-right">{{ "{:,}".format(year_summary.ala) }}</td>
+                <td class="px-4 py-3 text-right">{{ "{:,}".format(year_summary.course) }}</td>
+                <td class="px-4 py-3 text-right">{{ "{:,}".format(year_summary.appetizer) }}</td>
+                {% if has_other %}
+                <td class="px-4 py-3 text-right">{{ "{:,}".format(year_summary.other) }}</td>
+                {% endif %}
+                <td class="px-4 py-3 text-right">{{ "{:,}".format(year_summary.total) }}</td>
             </tr>
         </tfoot>
     </table>
 </div>
 <p class="text-xs text-gray-500 mt-2">円。コース客とアラカルト客は排他。季節係数は客数にだけ掛けている。</p>
+
+{% if selected_month and daily_rows %}
+<section class="mt-8">
+    <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-bold text-gray-800">{{ selected_month }} 月の日別売上（{{ "{:,}".format(daily_total) }} 円）</h2>
+        {% set close_run_param = ('run=' ~ run_id ~ '&') if run_id else '' %}
+        {% set close_variant_param = ('variant=' ~ request.query_params.get('variant') ~ '&') if request.query_params.get('variant') else '' %}
+        {% set close_tax_param = ('tax=' ~ tax) if tax else '' %}
+        <a class="text-xs text-blue-600 hover:underline"
+           href="/stores/{{ store_id }}/revenue?{{ close_run_param }}{{ close_variant_param }}{{ close_tax_param }}">
+            日別を閉じる
+        </a>
+    </div>
+    <div class="bg-white rounded-lg shadow overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-500">
+                <tr>
+                    <th class="px-4 py-3 text-left">日付</th>
+                    <th class="px-4 py-3 text-right">昼</th>
+                    <th class="px-4 py-3 text-right">夜</th>
+                    <th class="px-4 py-3 text-right">アラカルト</th>
+                    <th class="px-4 py-3 text-right">コース</th>
+                    <th class="px-4 py-3 text-right">お通し</th>
+                    {% if daily_has_other %}
+                    <th class="px-4 py-3 text-right">その他</th>
+                    {% endif %}
+                    <th class="px-4 py-3 text-right">合計</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for row in daily_rows %}
+                <tr>
+                    <td class="px-4 py-2">{{ row.date }}</td>
+                    <td class="px-4 py-2 text-right">{{ "{:,}".format(row.lunch) }}</td>
+                    <td class="px-4 py-2 text-right">{{ "{:,}".format(row.dinner) }}</td>
+                    <td class="px-4 py-2 text-right">{{ "{:,}".format(row.ala) }}</td>
+                    <td class="px-4 py-2 text-right">{{ "{:,}".format(row.course) }}</td>
+                    <td class="px-4 py-2 text-right">{{ "{:,}".format(row.appetizer) }}</td>
+                    {% if daily_has_other %}
+                    <td class="px-4 py-2 text-right">{{ "{:,}".format(row.other) }}</td>
+                    {% endif %}
+                    <td class="px-4 py-2 text-right font-medium">{{ "{:,}".format(row.total) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {

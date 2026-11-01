@@ -1,8 +1,9 @@
 """損益段階・CF・公庫照合・損益分岐点."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
+from typing import Any
 
 from restaurant_revenue_estimator.engine.cost import FixedCosts, VariableCosts
 
@@ -62,14 +63,75 @@ class JfcComparison:
     operating_margin: float
 
 
-def jfc_comparison(pnl: PnL) -> JfcComparison:
+@dataclass(frozen=True)
+class JfcRow:
+    key: str
+    label: str
+    estimate: str
+    average: str
+    profitable_average: str
+
+
+def jfc_comparison(pnl: PnL | Mapping[str, Any] | Any) -> JfcComparison:
     """公庫の定義（税込売上が分母、人件費に店主の労働対価を含む）に換算する."""
+    if isinstance(pnl, Mapping):
+        denominator = Decimal(str(pnl.get("gross_inc_tax") or 1))
+        gross_profit = Decimal(str(pnl.get("gross_profit", 0)))
+        labor = Decimal(str(pnl.get("labor", 0)))
+        owner_labor = Decimal(str(pnl.get("owner_labor", 0)))
+        store_operating_profit = Decimal(str(pnl.get("store_operating_profit", 0)))
+        return JfcComparison(
+            gross_profit_ratio=float(gross_profit / denominator),
+            labor_ratio=float((labor + owner_labor) / denominator),
+            operating_margin=float(store_operating_profit / denominator),
+        )
     denominator = Decimal(pnl.gross_inc_tax) or Decimal(1)
     return JfcComparison(
         gross_profit_ratio=float(pnl.gross_profit / denominator),
         labor_ratio=float((pnl.labor + pnl.owner_labor) / denominator),
         operating_margin=float(pnl.store_operating_profit / denominator),
     )
+
+
+def jfc_benchmark_rows(
+    pnl: PnL | Mapping[str, Any] | Any,
+    benchmark: Mapping[str, Any],
+    *,
+    null_label: str = "—",
+) -> list[JfcRow]:
+    """推計と公庫ベンチマークを照合した表の行を生成する."""
+    comparison = jfc_comparison(pnl)
+    metrics = benchmark.get("metrics", {})
+
+    def _fmt(val: Any) -> str:
+        if val is None or val == "—":
+            return null_label
+        if isinstance(val, (int, float)):
+            return f"{val:.1%}"
+        return str(val)
+
+    metric_defs = [
+        ("gross_profit_ratio", "総利益率"),
+        ("labor_ratio", "人件費率"),
+        ("operating_margin", "営業利益率"),
+    ]
+    rows: list[JfcRow] = []
+    for key, label in metric_defs:
+        est_val = getattr(comparison, key, None)
+        est_str = f"{est_val:.1%}" if isinstance(est_val, (int, float)) else null_label
+        metric_data = metrics.get(key, {})
+        avg_str = _fmt(metric_data.get("average"))
+        prof_str = _fmt(metric_data.get("profitable_average"))
+        rows.append(
+            JfcRow(
+                key=key,
+                label=label,
+                estimate=est_str,
+                average=avg_str,
+                profitable_average=prof_str,
+            )
+        )
+    return rows
 
 
 def break_even_sales(fixed_cost: Decimal, variable_rate: Decimal) -> int:

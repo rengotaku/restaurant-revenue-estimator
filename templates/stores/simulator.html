@@ -15,8 +15,29 @@
         <div><dt class="text-gray-500">年間税込売上</dt><dd class="font-medium">{{ "{:,}".format(result.revenue.total_inc_tax) }} 円</dd></div>
         <div><dt class="text-gray-500">事業所得相当</dt><dd class="font-medium">{{ "{:,}".format(result.pnl.business_income) }} 円</dd></div>
         <div><dt class="text-gray-500">replications</dt><dd class="font-medium">{{ result.run.replications if result.run else '—' }}</dd></div>
-        <div><dt class="text-gray-500">昼の入店客数（月）</dt><dd>{{ result.simulation.lunch_guests_by_weekday.get('mon', '—') }} 人</dd></div>
-        <div><dt class="text-gray-500">昼の失った需要</dt><dd>{{ "%.1f"|format(result.simulation.lost_lunch_guests) }} 人/日</dd></div>
+        <div>
+            <dt class="text-gray-500">昼の入店客数（1 日・曜日別）</dt>
+            <dd class="font-medium">
+                {% set wd_order = [('mon', '月'), ('tue', '火'), ('wed', '水'), ('thu', '木'), ('fri', '金'), ('sat', '土'), ('sun', '日')] %}
+                {% if result.simulation and result.simulation.lunch_guests_by_weekday %}
+                    {% set items = [] %}
+                    {% for en, jp in wd_order %}
+                        {% if en in result.simulation.lunch_guests_by_weekday %}
+                            {% set _ = items.append(jp ~ ' ' ~ result.simulation.lunch_guests_by_weekday[en] ~ ' 人') %}
+                        {% elif jp in result.simulation.lunch_guests_by_weekday %}
+                            {% set _ = items.append(jp ~ ' ' ~ result.simulation.lunch_guests_by_weekday[jp] ~ ' 人') %}
+                        {% endif %}
+                    {% endfor %}
+                    {{ items | join(' / ') if items else '—' }}
+                {% else %}
+                    —
+                {% endif %}
+            </dd>
+        </div>
+        <div>
+            <dt class="text-gray-500">昼の失った需要（営業日 1 日あたりの平均）</dt>
+            <dd class="font-medium">{{ "%.1f"|format(result.simulation.lost_lunch_guests) }} 人/日</dd>
+        </div>
         <div><dt class="text-gray-500">2 階</dt><dd>{{ result.variant }}</dd></div>
     </dl>
 </section>
@@ -47,6 +68,16 @@
         </div>
         {% endfor %}
     </div>
+
+    <fieldset class="border rounded p-3 mt-4 bg-gray-50">
+        <legend class="text-sm font-medium px-1 text-gray-700">1 階の卓構成（OBSERVED）</legend>
+        <p class="text-xs text-gray-500 mb-2">事実は YAML で直す</p>
+        <div class="flex flex-wrap gap-4 text-sm mb-1">
+            <label class="text-gray-600">4 人卓 <input name="floor1_4p" type="number" class="border rounded px-2 py-1 w-20 bg-gray-100 text-gray-500" value="{{ floor1_four }}" disabled></label>
+            <label class="text-gray-600">2 人卓 <input name="floor1_2p" type="number" class="border rounded px-2 py-1 w-20 bg-gray-100 text-gray-500" value="{{ floor1_two }}" disabled></label>
+        </div>
+        <p class="text-xs text-gray-400">1f-1 〜 1f-5 (4人卓), 1f-6 (2人卓)。観察事実（OBS-001）</p>
+    </fieldset>
 
     <fieldset class="border rounded p-3 mt-4">
         <legend class="text-sm font-medium px-1">2 階の卓構成（UNRESOLVED）</legend>

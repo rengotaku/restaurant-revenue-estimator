@@ -35,7 +35,10 @@ from restaurant_revenue_estimator.engine.dinner import (
     can_extend,
     simulate_dinner_day,
 )
-from restaurant_revenue_estimator.engine.lunch import simulate_lunch_day
+from restaurant_revenue_estimator.engine.lunch import (
+    lunch_occupancy_stats,
+    simulate_lunch_day,
+)
 from restaurant_revenue_estimator.engine.pnl import MonthlyPnL, PnL, build_monthly_pnl
 from restaurant_revenue_estimator.engine.revenue import (
     CourseSales,
@@ -50,6 +53,7 @@ from restaurant_revenue_estimator.engine.revenue import (
 from restaurant_revenue_estimator.engine.tables import Floor, FloorPolicyName, Table
 from restaurant_revenue_estimator.evidence.models import SourceStatus
 from restaurant_revenue_estimator.inputs import StoreInputs, input_hash, load_store
+from restaurant_revenue_estimator.services.screens import build_cost_breakdown
 
 WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 
@@ -114,6 +118,12 @@ class EvaluationResult:
     labor_breakdown: LaborBreakdown | None = None
     warnings: tuple[str, ...] = ()
     choices: dict[str, str] = field(default_factory=dict)
+    days: tuple[DaySales, ...] = ()
+    occupied_people: tuple[float, ...] = ()
+    lunch_occupancy_max: float = 0.0
+    lunch_occupancy_12_13_avg: float = 0.0
+    lunch_weekday_used: str = "月曜"
+    cost_breakdown: dict[str, Any] = field(default_factory=dict)
 
     @property
     def gross_inc_tax(self) -> int:
@@ -211,6 +221,31 @@ def _floors(
         ]
         variants.append((str(name), tables))
     return floors, fixed, variants
+
+
+def floor1_table_counts(inputs: StoreInputs) -> tuple[int, int]:
+    """Return (count_4p, count_2p) for 1st floor tables (OBSERVED)."""
+    layout = inputs.files.get("layout.yaml", {}) or {}
+    floors = layout.get("floors", [])
+    if not isinstance(floors, list):
+        return 0, 0
+    for floor in floors:
+        if isinstance(floor, dict) and floor.get("id") == "1f":
+            tables = floor.get("tables", {})
+            items = tables.get("value") if isinstance(tables, dict) else tables
+            if isinstance(items, list):
+                four_p = sum(
+                    1
+                    for t in items
+                    if isinstance(t, dict) and t.get("seats") == 4
+                )
+                two_p = sum(
+                    1
+                    for t in items
+                    if isinstance(t, dict) and t.get("seats") == 2
+                )
+                return four_p, two_p
+    return 0, 0
 
 
 def _courses(
@@ -851,11 +886,15 @@ def _evaluate_variant(
     values = {key: _assumption_value(raw) for key, raw in assumptions.items()}
 
     lunch_guests_by_weekday: dict[str, int] = {}
-    lost_lunch = 0.0
+    total_weighted_lost_lunch = 0.0
+    first_weekday_occupied: tuple[float, ...] = ()
+    weekday_used = "月曜"
     lunch_days = [day for day in calendar.open_days if day.lunch is not None]
+    total_lunch_days_count = len(lunch_days)
     if lunch_days:
         for index, weekday in enumerate(WEEKDAYS):
-            if not any(day.weekday == weekday for day in lunch_days):
+            days_for_weekday = sum(1 for day in lunch_days if day.weekday == weekday)
+            if days_for_weekday == 0:
                 continue
             sample = next(day for day in lunch_days if day.weekday == weekday)
             assert sample.lunch is not None
@@ -878,7 +917,27 @@ def _evaluate_variant(
                 seed=request.seed + index,
             )
             lunch_guests_by_weekday[weekday] = round(lunch.guests)
-            lost_lunch += lunch.lost
+            total_weighted_lost_lunch += lunch.lost * days_for_weekday
+            if not first_weekday_occupied and lunch.occupied_people:
+                first_weekday_occupied = lunch.occupied_people
+                jp_names = {
+                    "mon": "月曜",
+                    "tue": "火曜",
+                    "wed": "水曜",
+                    "thu": "木曜",
+                    "fri": "金曜",
+                    "sat": "土曜",
+                    "sun": "日曜",
+                }
+                weekday_used = jp_names.get(weekday, weekday)
+
+    lost_lunch_daily_avg = (
+        total_weighted_lost_lunch / total_lunch_days_count
+        if total_lunch_days_count > 0
+        else 0.0
+    )
+    cost_breakdown = build_cost_breakdown(assumptions)
+    max_occ, avg_12_13 = lunch_occupancy_stats(first_weekday_occupied)
 
     holidays = set(
         load_holidays(
@@ -952,7 +1011,7 @@ def _evaluate_variant(
         open_days=len(calendar.open_days),
         lunch_guests_by_weekday=lunch_guests_by_weekday,
         dinner_guests=dinner_guests,
-        lost_lunch_guests=lost_lunch,
+        lost_lunch_guests=lost_lunch_daily_avg,
         tables=tuple(tables),
         meta=meta,
         unresolved=unresolved,
@@ -963,6 +1022,12 @@ def _evaluate_variant(
         labor_breakdown=annual_breakdown,
         warnings=warnings,
         choices=dict(choices or {}),
+        days=tuple(days),
+        occupied_people=first_weekday_occupied,
+        lunch_occupancy_max=max_occ,
+        lunch_occupancy_12_13_avg=avg_12_13,
+        lunch_weekday_used=weekday_used,
+        cost_breakdown=cost_breakdown,
     )
 
 

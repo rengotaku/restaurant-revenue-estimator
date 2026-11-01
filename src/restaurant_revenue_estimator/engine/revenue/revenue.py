@@ -166,6 +166,25 @@ def _ex_tax(amount_inc_tax: int, rate: Decimal) -> int:
     return int(exact.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
+def allocate_ex_tax(columns_inc: Sequence[int], total_ex: int) -> list[int]:
+    """税込の列を税抜の合計に配分し、和が total_ex に一致する整数のリストを返す."""
+    if not columns_inc:
+        return []
+    total_inc = sum(columns_inc)
+    if total_inc == 0:
+        return [0] * (len(columns_inc) - 1) + [total_ex]
+    allocated: list[int] = []
+    for col in columns_inc[:-1]:
+        val = int(
+            (Decimal(col) * Decimal(total_ex) / Decimal(total_inc)).quantize(
+                Decimal("1"), rounding=ROUND_HALF_UP
+            )
+        )
+        allocated.append(val)
+    allocated.append(total_ex - sum(allocated))
+    return allocated
+
+
 def realized_course_price(
     normal: int, discounted: int, application_rate: Decimal
 ) -> int:

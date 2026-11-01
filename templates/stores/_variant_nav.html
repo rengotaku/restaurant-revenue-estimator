@@ -10,8 +10,10 @@
         <div class="flex flex-wrap items-center gap-2">
             <span class="text-gray-500 text-xs">切替:</span>
             {% set run_param = ('run=' ~ request.query_params.get('run') ~ '&') if request.query_params.get('run') else '' %}
+            {% set month_param = ('month=' ~ request.query_params.get('month') ~ '&') if request.query_params.get('month') else '' %}
+            {% set tax_param = ('tax=' ~ request.query_params.get('tax') ~ '&') if request.query_params.get('tax') else '' %}
             {% for v in variants %}
-            <a href="?{{ run_param }}variant={{ v.name }}"
+            <a href="?{{ run_param }}{{ month_param }}{{ tax_param }}variant={{ v.name }}"
                class="px-2.5 py-1 rounded text-xs {% if v.name == active_name %}bg-blue-600 text-white font-medium{% else %}border border-gray-300 text-gray-700 hover:bg-gray-50{% endif %}">
                 {{ v.name }}
             </a>
