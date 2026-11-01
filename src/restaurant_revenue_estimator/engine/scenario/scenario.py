@@ -93,6 +93,7 @@ def sensitivity(
         replications=max(1, min(request.replications, 5)),
         overrides=request.overrides,
         saturday_closure=request.saturday_closure,
+        saturday_hours_candidate=request.saturday_hours_candidate,
     )
     baseline = evaluate(data_dir, small)[0]
     inputs = load_store(data_dir / "stores" / request.store_id)
@@ -100,20 +101,29 @@ def sensitivity(
         inputs.files.get(f"assumptions/{request.assumption_set}.yaml", {}) or {}
     )
 
-    row_small = small
-    if "layout.floor2" not in (small.overrides or {}) and baseline.variant:
-        row_overrides = dict(small.overrides or {})
-        row_overrides["layout.floor2"] = baseline.variant
-        row_small = EvaluationRequest(
-            store_id=small.store_id,
-            assumption_set=small.assumption_set,
-            year=small.year,
-            calendar_mode=small.calendar_mode,
-            seed=small.seed,
-            replications=small.replications,
-            overrides=row_overrides,
-            saturday_closure=small.saturday_closure,
-        )
+    floor2_choice = baseline.choices.get("layout.floor2") or baseline.variant
+    closure_choice = small.saturday_closure or baseline.choices.get(
+        "saturday_closure_start"
+    )
+    hours_choice = small.saturday_hours_candidate or baseline.choices.get(
+        "saturday_hours_before_closure"
+    )
+
+    row_overrides = dict(small.overrides or {})
+    if "layout.floor2" not in row_overrides and floor2_choice:
+        row_overrides["layout.floor2"] = floor2_choice
+
+    row_small = EvaluationRequest(
+        store_id=small.store_id,
+        assumption_set=small.assumption_set,
+        year=small.year,
+        calendar_mode=small.calendar_mode,
+        seed=small.seed,
+        replications=small.replications,
+        overrides=row_overrides,
+        saturday_closure=closure_choice,
+        saturday_hours_candidate=hours_choice,
+    )
 
     rows: list[SensitivityRow] = []
     for key, raw in assumptions.items():
@@ -156,7 +166,8 @@ def sensitivity(
                         seed=small.seed,
                         replications=small.replications,
                         overrides=override,
-                        saturday_closure=small.saturday_closure,
+                        saturday_closure=closure_choice,
+                        saturday_hours_candidate=hours_choice,
                     )
                     result = evaluate(data_dir, candidate_request)[0]
                     rows.append(
@@ -188,9 +199,16 @@ def _row(
     how_to_verify: str,
 ) -> SensitivityRow:
     overrides = dict(request.overrides or {})
-    if "layout.floor2" not in overrides and baseline.variant:
-        overrides["layout.floor2"] = baseline.variant
+    floor2_choice = baseline.choices.get("layout.floor2") or baseline.variant
+    if "layout.floor2" not in overrides and floor2_choice:
+        overrides["layout.floor2"] = floor2_choice
     overrides[key] = value
+    closure_choice = request.saturday_closure or baseline.choices.get(
+        "saturday_closure_start"
+    )
+    hours_choice = request.saturday_hours_candidate or baseline.choices.get(
+        "saturday_hours_before_closure"
+    )
     candidate = EvaluationRequest(
         store_id=request.store_id,
         assumption_set=request.assumption_set,
@@ -199,7 +217,8 @@ def _row(
         seed=request.seed,
         replications=request.replications,
         overrides=overrides,
-        saturday_closure=request.saturday_closure,
+        saturday_closure=closure_choice,
+        saturday_hours_candidate=hours_choice,
     )
     result = evaluate(data_dir, candidate)[0]
     return SensitivityRow(

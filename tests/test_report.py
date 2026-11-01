@@ -7,8 +7,15 @@ from typer.testing import CliRunner
 
 from restaurant_revenue_estimator.cli import app
 from restaurant_revenue_estimator.inputs import load_store
-from restaurant_revenue_estimator.report import render_markdown, result_to_dict
-from restaurant_revenue_estimator.services.evaluation import EvaluationRequest, evaluate
+from restaurant_revenue_estimator.report import (
+    render_run_markdown,
+    result_to_dict,
+)
+from restaurant_revenue_estimator.services.evaluation import (
+    EvaluationRequest,
+    evaluate,
+    evaluate_run,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "data"
@@ -19,9 +26,11 @@ REQUEST = EvaluationRequest(store_id="birdman_tamachi", replications=1)
 
 
 def _report() -> str:
-    result = evaluate(DATA, REQUEST)[0]
-    return render_markdown(
-        result, load_store(STORE), benchmark={"definition_note": "税込", "metrics": {}}
+    document = evaluate_run(DATA, REQUEST)
+    return render_run_markdown(
+        document,
+        load_store(STORE),
+        benchmark={"definition_note": "税込", "metrics": {}},
     )
 
 

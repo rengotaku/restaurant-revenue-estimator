@@ -14,13 +14,13 @@ from restaurant_revenue_estimator.inputs import load_store, validate_all, valida
 from restaurant_revenue_estimator.inputs.legacy import check_legacy, format_legacy_check
 from restaurant_revenue_estimator.report import (
     load_benchmark,
-    render_markdown,
-    result_to_dict,
+    render_run_markdown,
 )
 from restaurant_revenue_estimator.services.evaluation import (
     EvaluationError,
     EvaluationRequest,
-    evaluate,
+    evaluate,  # noqa: F401
+    evaluate_run,
     plain,
 )
 from restaurant_revenue_estimator.services.reporting import build_report_markdown
@@ -127,19 +127,21 @@ def run(
         replications=replications,
     )
     try:
-        results = evaluate(data_dir, request)
+        document = evaluate_run(data_dir, request)
     except EvaluationError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(1) from exc
-    result = results[0]
-    run_id = f"{store_id}-{result.meta.input_hash[:12]}-{seed}-{assumptions}-{calendar}"
+    result = document.results[0]
+    run_id = (
+        f"{store_id}-{document.meta.input_hash[:12]}-{seed}-{assumptions}-{calendar}"
+    )
     directory = runs_dir / run_id
     directory.mkdir(parents=True, exist_ok=True)
 
-    report_text = build_report_markdown(data_dir, result, request)
+    report_text = build_report_markdown(data_dir, document, request)
 
     (directory / "result.json").write_text(
-        json.dumps(result_to_dict(result), ensure_ascii=False, indent=2, sort_keys=True)
+        json.dumps(document.to_dict(), ensure_ascii=False, indent=2, sort_keys=True)
         + "\n",
         encoding="utf-8",
     )
@@ -155,7 +157,7 @@ def run(
                 "assumptions": assumptions,
                 "seed": seed,
                 "replications": replications,
-                "meta": result.meta.as_dict(),
+                "meta": document.meta.as_dict(),
             },
             ensure_ascii=False,
             indent=2,
@@ -188,11 +190,11 @@ def report(
         seed=int(run_meta["seed"]),
         replications=int(run_meta["replications"]),
     )
-    result = evaluate(data_dir, request)[0]
+    document = evaluate_run(data_dir, request)
     benchmark_path = data_dir / "benchmarks" / "jfc_2025_izakaya.yaml"
     benchmark = load_benchmark(benchmark_path) if benchmark_path.exists() else None
     (run_dir / "report.md").write_text(
-        render_markdown(result, inputs, benchmark=benchmark), encoding="utf-8"
+        render_run_markdown(document, inputs, benchmark=benchmark), encoding="utf-8"
     )
     typer.echo(str(run_dir / "report.md"))
 

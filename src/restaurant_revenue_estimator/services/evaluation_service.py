@@ -14,7 +14,6 @@ from restaurant_revenue_estimator.inputs import (
     validate_shift_specs,
 )
 from restaurant_revenue_estimator.models import Run, Scenario
-from restaurant_revenue_estimator.report import result_to_dict
 from restaurant_revenue_estimator.repositories.scenario_repo import (
     RunRepository,
     ScenarioRepository,
@@ -23,7 +22,8 @@ from restaurant_revenue_estimator.services.evaluation import (
     EvaluationError,
     EvaluationRequest,
     apply_overrides,
-    evaluate,
+    evaluate,  # noqa: F401  monkeypatch target for tests
+    evaluate_run,
 )
 from restaurant_revenue_estimator.services.reporting import build_report_markdown
 
@@ -130,18 +130,8 @@ def execute_run(
         replications=req.replications,
         overrides=req.overrides,
     )
-    results = evaluate(data_dir, request)
-    choice = req.overrides.get("layout.floor2")
-    if isinstance(choice, str):
-        result = next((item for item in results if item.variant == choice), results[0])
-    elif isinstance(choice, list):
-        result = next(
-            (item for item in results if item.variant == "custom"), results[0]
-        )
-    else:
-        result = results[0]
-
-    report = build_report_markdown(data_dir, result, request)
+    document = evaluate_run(data_dir, request)
+    report = build_report_markdown(data_dir, document, request)
     run = Run(
         store_id=store_id,
         scenario_id=scenario.id if scenario else None,
@@ -151,12 +141,10 @@ def execute_run(
         seed=req.seed,
         replications=req.replications,
         input_hash=run_hash,
-        model_version=result.meta.model_version,
+        model_version=document.meta.model_version,
         code_sha256=code_version.current_code_sha256(),
-        calendar_sha256=result.meta.calendar_sha256,
-        result_json=json.dumps(
-            result_to_dict(result), ensure_ascii=False, sort_keys=True
-        ),
+        calendar_sha256=document.meta.calendar_sha256,
+        result_json=json.dumps(document.to_dict(), ensure_ascii=False, sort_keys=True),
         report_md=report,
     )
     return repository.add(run)

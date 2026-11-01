@@ -74,24 +74,27 @@ def test_unresolved_floor_can_be_replaced_with_tables(client: TestClient) -> Non
     )
     assert response.status_code == 200
     payload = response.json()
+    assert len(payload["variants"]) == 1
     two_floor = [
-        table for table in payload["simulation"]["tables"] if table["floor"] == "2f"
+        table
+        for table in payload["variants"][0]["simulation"]["tables"]
+        if table["floor"] == "2f"
     ]
     assert len(two_floor) == 6
-    assert payload["variant"] == "custom"
+    assert payload["variants"][0]["variant"] == "custom"
 
 
 def test_same_parameters_return_cached_run(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     calls = {"count": 0}
-    original = services.evaluation_service.evaluate
+    original = services.evaluation_service.evaluate_run
 
     def counting(*args: object, **kwargs: object) -> object:
         calls["count"] += 1
         return original(*args, **kwargs)  # type: ignore[arg-type]
 
-    monkeypatch.setattr(services.evaluation_service, "evaluate", counting)
+    monkeypatch.setattr(services.evaluation_service, "evaluate_run", counting)
     first = client.post("/api/stores/birdman_tamachi/runs", json=_run_payload())
     second = client.post("/api/stores/birdman_tamachi/runs", json=_run_payload())
     assert first.status_code == second.status_code == 200
@@ -163,12 +166,15 @@ def test_revenue_page_totals_match_result(client: TestClient) -> None:
     ).json()
     page = client.get("/stores/birdman_tamachi/revenue?tax=inc")
     assert page.status_code == 200
-    total = run["revenue"]["total_inc_tax"]
+    total = run["variants"][0]["revenue"]["total_inc_tax"]
     assert f"{total:,}" in page.text
-    assert sum(month["total_inc_tax"] for month in run["revenue"]["months"]) == total
+    assert (
+        sum(month["total_inc_tax"] for month in run["variants"][0]["revenue"]["months"])
+        == total
+    )
 
     ex_page = client.get("/stores/birdman_tamachi/revenue?tax=ex")
-    assert f"{run['revenue']['total_ex_tax']:,}" in ex_page.text
+    assert f"{run['variants'][0]['revenue']['total_ex_tax']:,}" in ex_page.text
 
 
 def test_calendar_historical_saturday_rule() -> None:

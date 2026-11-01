@@ -53,6 +53,22 @@ def set_templates(tmpl: Jinja2Templates) -> None:
     templates = tmpl
 
 
+def _extract_variants(result: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """実行結果から候補の一覧を取り出す.
+    variants があればそれを返し、無ければ旧形式の最上位の中身を 1 件の候補として返す
+    （name は最上位の variant、choices は空の dict）.
+    """
+    if not result:
+        return []
+    variants = result.get("variants")
+    if isinstance(variants, list):
+        return [dict(v) for v in variants if isinstance(v, dict)]
+    candidate = dict(result)
+    candidate["name"] = result.get("variant", "")
+    candidate["choices"] = {}
+    return [candidate]
+
+
 def _ctx(**kwargs: Any) -> dict[str, Any]:
     context: dict[str, Any] = {
         "stores": list_stores(data_directory()),
@@ -67,6 +83,7 @@ def _ctx(**kwargs: Any) -> dict[str, Any]:
         "selected_scenario": None,
         "has_run": False,
         "run_id": None,
+        "variants": [],
     }
     context.update(kwargs)
     return context
@@ -76,9 +93,10 @@ def _render(
     request: Request, template: str, status_code: int = 200, **kwargs: Any
 ) -> HTMLResponse:
     assert templates is not None
-    return templates.TemplateResponse(
-        request, template, _ctx(**kwargs), status_code=status_code
-    )
+    ctx = _ctx(**kwargs)
+    if "variants" not in kwargs:
+        ctx["variants"] = _extract_variants(ctx.get("result"))
+    return templates.TemplateResponse(request, template, ctx, status_code=status_code)
 
 
 def _floor2_candidates(inputs: StoreInputs) -> list[str]:
@@ -163,6 +181,37 @@ def _run_result(run: Run) -> dict[str, Any]:
     return payload
 
 
+def _active_variant(
+    result: dict[str, Any] | None, variant_name: str | None = None
+) -> dict[str, Any] | None:
+    """表示対象の variant を返す（?variant=<name>、無い・見つからないときは先頭）.
+    最上位のメタ情報（run, run_id, meta, overrides など）も合成して返す.
+    """
+    if result is None:
+        return None
+    variants = result.get("variants")
+    if not variants or not isinstance(variants, list):
+        return result
+
+    selected: dict[str, Any] | None = None
+    if variant_name:
+        for v in variants:
+            if isinstance(v, dict) and v.get("name") == variant_name:
+                selected = v
+                break
+    if selected is None:
+        selected = variants[0]
+
+    merged = dict(selected)
+    for key in ("meta", "overrides", "unresolved"):
+        if key in result and key not in merged:
+            merged[key] = result[key]
+    for key in ("run", "run_id", "variants", "scenarios"):
+        if key in result:
+            merged[key] = result[key]
+    return merged
+
+
 def _get_store(store_id: str) -> StoreInputs:
     directory = data_directory() / "stores" / store_id
     if not directory.exists():
@@ -178,7 +227,8 @@ def index(request: Request, session: Session = Depends(get_session)) -> HTMLResp
     for store in stores:
         run = repository.latest_default(store["store_id"])
         if run is not None:
-            result = _run_result(run)
+            result = _active_variant(_run_result(run))
+            assert result is not None
             latest[store["store_id"]] = {
                 "run_id": run.id,
                 "gross": result["revenue"]["total_inc_tax"],
@@ -192,12 +242,15 @@ def store_summary(
     request: Request,
     store_id: str,
     run: int | None = None,
+    variant: str | None = None,
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     inputs = _get_store(store_id)
     summary = summarize(inputs)
     selected_run, banner = _resolve_run(session, store_id, run)
-    result = _run_result(selected_run)
+    raw = _run_result(selected_run) if selected_run else None
+    result = _active_variant(raw, variant)
+    variants = _extract_variants(raw)
     return _render(
         request,
         "stores/summary.html",
@@ -205,6 +258,7 @@ def store_summary(
         summary=summary,
         run=selected_run,
         result=result,
+        variants=variants,
         banner=banner,
     )
 
@@ -235,25 +289,50 @@ def store_revenue(
     store_id: str,
     tax: str = "inc",
     run: int | None = None,
+    variant: str | None = None,
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     selected_run, banner = _resolve_run(session, store_id, run)
-    result = _run_result(selected_run)
+    raw = _run_result(selected_run) if selected_run else None
+    result = _active_variant(raw, variant)
+    variants = _extract_variants(raw)
+    assert result is not None
     months = result["revenue"]["months"]
     key = "total_inc_tax" if tax == "inc" else "total_ex_tax"
     chart = {
         "labels": [f"{month['month']}月" for month in months],
         "values": [month[key] for month in months],
     }
+
+    scenario_order = {"pessimistic": 0, "standard": 1, "optimistic": 2}
+    scenario_names = {"pessimistic": "悲観", "standard": "標準", "optimistic": "楽観"}
+    raw_scenarios = [
+        s for s in result.get("scenarios", []) if s.get("variant") == result.get("name")
+    ]
+    raw_scenarios.sort(
+        key=lambda s: scenario_order.get(s.get("assumption_set", ""), 99)
+    )
+    variant_scenarios = [
+        {
+            **s,
+            "display_name": scenario_names.get(
+                s.get("assumption_set", ""), s.get("assumption_set", "")
+            ),
+        }
+        for s in raw_scenarios
+    ]
+
     return _render(
         request,
         "stores/revenue.html",
         store_id=store_id,
         result=result,
+        variants=variants,
         months=months,
         total=result["revenue"][key],
         tax=tax,
         chart=json.dumps(chart, ensure_ascii=False),
+        variant_scenarios=variant_scenarios,
         banner=banner,
         run_id=run,
     )
@@ -357,17 +436,21 @@ def store_layout(
     request: Request,
     store_id: str,
     run: int | None = None,
+    variant: str | None = None,
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     inputs = _get_store(store_id)
     selected_run, banner = _resolve_run(session, store_id, run)
-    result = _run_result(selected_run)
+    raw = _run_result(selected_run) if selected_run else None
+    result = _active_variant(raw, variant)
+    variants = _extract_variants(raw)
     return _render(
         request,
         "stores/layout.html",
         store_id=store_id,
         floor_rows=_floor_view(inputs),
         result=result,
+        variants=variants,
         banner=banner,
     )
 
@@ -398,6 +481,7 @@ def store_simulator(
     request: Request,
     store_id: str,
     run: int | None = None,
+    variant: str | None = None,
     scenario: int | None = None,
     saved: bool = False,
     session: Session = Depends(get_session),
@@ -406,7 +490,9 @@ def store_simulator(
     keys = _writable_keys(inputs, "standard")
     scenarios = ScenarioRepository(session).list(store_id)
     selected_run, banner = _resolve_run(session, store_id, run)
-    result = _run_result(selected_run) if selected_run else None
+    result = (
+        _active_variant(_run_result(selected_run), variant) if selected_run else None
+    )
     selected_scenario = None
     selected_overrides: dict[str, Any] = {}
     floor2_choice: str = ""
@@ -483,7 +569,9 @@ async def submit_simulator(
         if count_4p is None or count_2p is None or (count_4p + count_2p == 0):
             error_msg = "自由入力では 0 以上の整数を入力し、1 卓以上入れる"
             selected_run = RunRepository(session).latest_default(store_id)
-            result = _run_result(selected_run) if selected_run else None
+            result = (
+                _active_variant(_run_result(selected_run)) if selected_run else None
+            )
             return _render(
                 request,
                 "stores/simulator.html",
@@ -555,11 +643,15 @@ def store_costs(
     request: Request,
     store_id: str,
     run: int | None = None,
+    variant: str | None = None,
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     inputs = _get_store(store_id)
     selected_run, banner = _resolve_run(session, store_id, run)
-    result = _run_result(selected_run)
+    raw = _run_result(selected_run) if selected_run else None
+    result = _active_variant(raw, variant)
+    variants = _extract_variants(raw)
+    assert result is not None
     assumptions = inputs.files.get("assumptions/standard.yaml", {}) or {}
     warnings = list(result.get("warnings") or [])
     pnl = result["pnl"]
@@ -574,6 +666,7 @@ def store_costs(
         "stores/costs.html",
         store_id=store_id,
         result=result,
+        variants=variants,
         pnl=pnl,
         assumptions=assumptions,
         warnings=warnings,
@@ -617,35 +710,215 @@ def store_priorities(
     )
 
 
-@router.get("/compare", response_class=HTMLResponse)
-def compare(
-    request: Request,
-    runs: str | None = None,
-    session: Session = Depends(get_session),
-) -> HTMLResponse:
-    repository = RunRepository(session)
-    all_runs: list[Run | None] = []
-    if runs:
-        ids = [int(item) for item in runs.split(",") if item.strip()]
-        all_runs = [repository.get(run_id) for run_id in ids]
+def _resolve_item_run(
+    session: Session,
+    raw_token: str,
+    year: int,
+    calendar: str,
+) -> tuple[dict[str, Any] | None, Run | None, str | None]:
+    token = raw_token.strip()
+    if not token:
+        return None, None, None
+    parts = token.split(":")
+    scenario_names = {
+        "pessimistic": "悲観",
+        "standard": "標準",
+        "optimistic": "楽観",
+    }
+    if len(parts) == 3 and parts[1] == "scenario":
+        store_id = parts[0]
+        try:
+            sc_id = int(parts[2])
+        except ValueError:
+            return None, None, f"不正なシナリオID: {parts[2]}"
+        sc = ScenarioRepository(session).get(sc_id)
+        if sc is None:
+            return None, None, f"シナリオが無い: {sc_id}"
+        label = sc.name
+        req = RunRequest(
+            scenario_id=sc_id,
+            year=year,
+            calendar_mode=calendar,
+            seed=42,
+            replications=20,
+        )
+    elif len(parts) == 2:
+        store_id = parts[0]
+        aset = parts[1]
+        label = scenario_names.get(aset, aset)
+        req = RunRequest(
+            assumption_set=aset,
+            year=year,
+            calendar_mode=calendar,
+            seed=42,
+            replications=20,
+        )
+    else:
+        return None, None, f"不正な形式: {token}"
+
+    try:
+        run = execute_run(session, data_directory(), store_id, req)
+    except Exception as exc:
+        return None, None, str(exc)
+
+    res_data = _run_result(run)
+    group = {
+        "label": label,
+        "store_id": store_id,
+        "run": run,
+        "variants": _extract_variants(res_data),
+        "year": run.year,
+        "calendar_mode": run.calendar_mode,
+    }
+    return group, run, None
+
+
+def _load_compare_items(
+    session: Session,
+    items: str,
+    year: int,
+    calendar: str,
+) -> tuple[list[dict[str, Any]], list[Run], str | None]:
+    groups: list[dict[str, Any]] = []
+    selected: list[Run] = []
+    for raw_token in items.split(","):
+        group, run, err = _resolve_item_run(session, raw_token, year, calendar)
+        if err:
+            return [], [], err
+        if group and run:
+            groups.append(group)
+            selected.append(run)
+    return groups, selected, None
+
+
+def _load_compare_runs(
+    repository: RunRepository,
+    session: Session,
+    runs: str,
+) -> tuple[list[dict[str, Any]], list[Run], str | None]:
+    ids = [int(item) for item in runs.split(",") if item.strip()]
+    all_runs = [repository.get(run_id) for run_id in ids]
     selected = [run for run in all_runs if run is not None]
-    error = None
     if len(selected) >= 2:
         years = {run.year for run in selected}
         modes = {run.calendar_mode for run in selected}
         if len(years) > 1 or len(modes) > 1:
-            error = "年または暦のモードが違う実行は比較できない。同じ期間で比べる。"
-            selected = []
-    rows = [_run_result(run) for run in selected]
-    recent = repository.list_recent(20) if not selected else []
+            return (
+                [],
+                [],
+                "年または暦のモードが違う実行は比較できない。同じ期間で比べる。",
+            )
+    scenario_names = {
+        "pessimistic": "悲観",
+        "standard": "標準",
+        "optimistic": "楽観",
+    }
+    groups: list[dict[str, Any]] = []
+    for run in selected:
+        label = _banner_text(session, run) or scenario_names.get(
+            run.assumption_set, run.assumption_set
+        )
+        res_data = _run_result(run)
+        groups.append(
+            {
+                "label": label,
+                "store_id": run.store_id,
+                "run": run,
+                "variants": _extract_variants(res_data),
+                "year": run.year,
+                "calendar_mode": run.calendar_mode,
+            }
+        )
+    return groups, selected, None
+
+
+def _compare_options(
+    session: Session,
+    stores: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    scenario_repo = ScenarioRepository(session)
+    options: list[dict[str, str]] = [{"value": "", "label": "（選ばない）"}]
+    for store in stores:
+        store_id = store["store_id"]
+        store_name = store["name"]
+        options.append(
+            {"value": f"{store_id}:pessimistic", "label": f"{store_name} 悲観"}
+        )
+        options.append({"value": f"{store_id}:standard", "label": f"{store_name} 標準"})
+        options.append(
+            {"value": f"{store_id}:optimistic", "label": f"{store_name} 楽観"}
+        )
+        for sc in scenario_repo.list(store_id):
+            options.append(
+                {
+                    "value": f"{store_id}:scenario:{sc.id}",
+                    "label": f"{store_name} シナリオ「{sc.name}」",
+                }
+            )
+    return options
+
+
+@router.get("/compare", response_class=HTMLResponse)
+def compare(
+    request: Request,
+    items: str | None = None,
+    year: int = 2026,
+    calendar: str = "steady",
+    runs: str | None = None,
+    session: Session = Depends(get_session),
+) -> Response:
+    if not items and "item" in request.query_params:
+        raw_items = request.query_params.getlist("item")
+        chosen = [t.strip() for t in raw_items if t.strip()]
+        if chosen:
+            return RedirectResponse(
+                url=f"/compare?items={','.join(chosen)}&year={year}&calendar={calendar}",
+                status_code=303,
+            )
+        return RedirectResponse(
+            url=f"/compare?year={year}&calendar={calendar}",
+            status_code=303,
+        )
+
+    repository = RunRepository(session)
+    error = None
+    groups: list[dict[str, Any]] = []
+    selected: list[Run] = []
+
+    if items:
+        groups, selected, error = _load_compare_items(session, items, year, calendar)
+    elif runs:
+        groups, selected, error = _load_compare_runs(repository, session, runs)
+
+    rows = (
+        [_active_variant(_run_result(run)) for run in selected]
+        if selected and not groups
+        else []
+    )
+    recent = (
+        repository.list_recent(20) if not selected and not items and not runs else []
+    )
+    stores = list_stores(data_directory())
+    compare_options = _compare_options(session, stores)
+    current_tokens = [t.strip() for t in items.split(",") if t.strip()] if items else []
+    selected_items = [
+        current_tokens[i] if i < len(current_tokens) else "" for i in range(4)
+    ]
     return _render(
         request,
         "compare.html",
         selected=selected,
+        groups=groups,
         rows=rows,
         error=error,
+        items_query=items or "",
         runs_query=runs or "",
+        year=year,
+        calendar=calendar,
         recent=recent,
+        stores=stores,
+        compare_options=compare_options,
+        selected_items=selected_items,
     )
 
 
