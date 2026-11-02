@@ -13,6 +13,7 @@ from restaurant_revenue_estimator import database
 from restaurant_revenue_estimator.app import app
 from restaurant_revenue_estimator.database import get_session
 from tests.eval_cache import EXCLUDED_TESTS, TARGET_FILES, CachedEvaluate
+from tests.report_stub import REAL_REPORT_SENSITIVITY_TESTS
 
 _session_cached_evaluate = CachedEvaluate()
 
@@ -40,6 +41,26 @@ def patch_evaluation_cache(
     if filename in TARGET_FILES and not is_excluded:
         for target in PATCH_TARGETS:
             monkeypatch.setattr(target, _session_cached_evaluate)
+
+
+@pytest.fixture(autouse=True)
+def stub_report_sensitivity(
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """REAL_REPORT_SENSITIVITY_TESTS 以外のテストで
+    レポート生成用の sensitivity を空リストに差し替える.
+    """
+    test_name = getattr(request.node, "originalname", None) or request.node.name
+    is_real = (
+        test_name in REAL_REPORT_SENSITIVITY_TESTS
+        or request.node.name in REAL_REPORT_SENSITIVITY_TESTS
+    )
+    if not is_real:
+        monkeypatch.setattr(
+            "restaurant_revenue_estimator.services.reporting.sensitivity",
+            lambda *args, **kwargs: [],
+        )
 
 
 @pytest.fixture
