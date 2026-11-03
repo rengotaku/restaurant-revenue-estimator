@@ -36,6 +36,7 @@ from restaurant_revenue_estimator.engine.dinner import (
     simulate_dinner_day,
 )
 from restaurant_revenue_estimator.engine.lunch import (
+    lunch_arrival_groups_for_weekday,
     lunch_occupancy_stats,
     simulate_lunch_day,
 )
@@ -903,7 +904,11 @@ def _evaluate_variant(
             lunch = simulate_lunch_day(
                 tables=tables,
                 floors=floors,
-                total_groups=float(values["lunch_arrival_groups"]),
+                total_groups=lunch_arrival_groups_for_weekday(
+                    float(values["lunch_arrival_groups"]),
+                    values.get("lunch_arrival_weekday_factor"),
+                    weekday,
+                ),
                 group_sizes=[int(key) for key in values["group_size_distribution"]],
                 group_probs=[
                     float(value) for value in values["group_size_distribution"].values()

@@ -388,6 +388,57 @@ def _validate_lunch_stay_ratio_by_group_size(
     return issues
 
 
+VALID_WEEKDAYS = frozenset({"mon", "tue", "wed", "thu", "fri", "sat", "sun"})
+
+
+def _is_valid_weekday_factor_map(val: Any) -> bool:
+    if not isinstance(val, dict) or not val:
+        return False
+    for k, v in val.items():
+        if not isinstance(k, str) or k not in VALID_WEEKDAYS:
+            return False
+        if isinstance(v, bool) or not isinstance(v, (int, float, Decimal)):
+            return False
+        try:
+            fv = float(v)
+            if not math.isfinite(fv) or fv <= 0:
+                return False
+        except (ValueError, TypeError, OverflowError):
+            return False
+    return True
+
+
+def _validate_lunch_arrival_weekday_factor(
+    entry: ValueEntry,
+) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    reason_msg = (
+        f"{entry.path} はキーが mon〜sun で、値が正の有限数の対応表である必要があります"
+    )
+    if entry.value.value is not None and not _is_valid_weekday_factor_map(
+        entry.value.value
+    ):
+        issues.append(
+            ValidationIssue(file=entry.file, path=entry.path, reason=reason_msg)
+        )
+    if entry.value.range is not None:
+        for rk in ("low", "base", "high"):
+            rval = (
+                entry.value.range.get(rk)
+                if isinstance(entry.value.range, dict)
+                else getattr(entry.value.range, rk, None)
+            )
+            if not _is_valid_weekday_factor_map(rval):
+                issues.append(
+                    ValidationIssue(
+                        file=entry.file,
+                        path=f"{entry.path}.range.{rk}",
+                        reason=reason_msg,
+                    )
+                )
+    return issues
+
+
 def _validate_labor_shifts_and_premium(
     inputs: StoreInputs,
 ) -> list[ValidationIssue]:
@@ -399,6 +450,8 @@ def _validate_labor_shifts_and_premium(
             issues.extend(_validate_part_time_shifts(entry))
         elif entry.path == "lunch_stay_ratio_by_group_size":
             issues.extend(_validate_lunch_stay_ratio_by_group_size(entry))
+        elif entry.path == "lunch_arrival_weekday_factor":
+            issues.extend(_validate_lunch_arrival_weekday_factor(entry))
     return issues
 
 
