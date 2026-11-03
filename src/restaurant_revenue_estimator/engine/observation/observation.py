@@ -1,5 +1,6 @@
 """観察との整合: 観察を述語にして、再現できた組合せを全部出す."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from restaurant_revenue_estimator.engine.lunch import simulate_lunch_day
@@ -86,6 +87,12 @@ def fit_grid(
     max_wait_minutes: int,
     replications: int,
     seed: int = 42,
+    stay_ratio_by_group_size: (
+        Mapping[int, float]
+        | Mapping[str, float]
+        | Mapping[int | str, float]
+        | None
+    ) = None,
 ) -> list[FitRow]:
     """2 階の候補 × 到着 × 滞在 の全組合せを回す. 単一の最良値は出さない."""
     rows: list[FitRow] = []
@@ -105,6 +112,7 @@ def fit_grid(
                     max_wait_minutes=max_wait_minutes,
                     replications=replications,
                     seed=seed,
+                    stay_ratio_by_group_size=stay_ratio_by_group_size,
                 )
                 matches = [
                     check_observation(result, full_tables=len(floor1_tables))

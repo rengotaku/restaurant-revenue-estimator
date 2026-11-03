@@ -1,6 +1,6 @@
 """1 分刻みの卓シミュレーション (ADR 0003)."""
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal
 
@@ -106,6 +106,7 @@ def simulate(  # noqa: PLR0912, PLR0915
     stay_minutes: int = 40,
     stay_spread: int = 5,
     record_series: bool = True,
+    stay_by_size: Mapping[int, float] | None = None,
 ) -> SimulationResult:
     """1 日分を回す. arrivals を渡すと台本モード."""
     rng = np.random.default_rng(seed)
@@ -113,7 +114,13 @@ def simulate(  # noqa: PLR0912, PLR0915
     if arrival_rate is not None:
         scripted.extend(
             _sample_arrivals(
-                rng, arrival_rate, group_sizes, group_probs, stay_minutes, stay_spread
+                rng,
+                arrival_rate,
+                group_sizes,
+                group_probs,
+                stay_minutes,
+                stay_spread,
+                stay_by_size=stay_by_size,
             )
         )
     scripted.sort(key=lambda item: item.minute)
@@ -327,6 +334,7 @@ def _sample_arrivals(
     group_probs: Sequence[float],
     stay_minutes: int,
     stay_spread: int,
+    stay_by_size: Mapping[int, float] | None = None,
 ) -> list[Arrival]:
     arrivals: list[Arrival] = []
     for window_index, rate in enumerate(arrival_rate):
@@ -334,7 +342,12 @@ def _sample_arrivals(
         for _ in range(count):
             minute = window_index * 5 + int(rng.integers(0, 5))
             size = int(rng.choice(group_sizes, p=group_probs))
-            stay = max(1, round(stay_minutes + rng.normal(0, stay_spread)))
+            if stay_by_size is not None and size in stay_by_size:
+                m_s = stay_by_size[size]
+                spread_s = max(1, int(m_s // 8))
+                stay = max(1, round(m_s + rng.normal(0, spread_s)))
+            else:
+                stay = max(1, round(stay_minutes + rng.normal(0, stay_spread)))
             arrivals.append(Arrival(minute=minute, size=size, stay_minutes=stay))
     return arrivals
 

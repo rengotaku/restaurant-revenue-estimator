@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import math
 import re
 from dataclasses import dataclass
 from decimal import Decimal
@@ -344,6 +345,49 @@ def _validate_part_time_shifts(entry: ValueEntry) -> list[ValidationIssue]:
     return issues
 
 
+def _is_valid_stay_ratio_map(val: Any) -> bool:
+    if not isinstance(val, dict) or not val:
+        return False
+    for k, v in val.items():
+        try:
+            int(k)
+            if isinstance(v, bool) or not isinstance(v, (int, float, Decimal)):
+                return False
+            fv = float(v)
+            if not math.isfinite(fv) or fv <= 0:
+                return False
+        except (ValueError, TypeError, OverflowError):
+            return False
+    return True
+
+
+def _validate_lunch_stay_ratio_by_group_size(
+    entry: ValueEntry,
+) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    reason_msg = (
+        f"{entry.path} はキーが整数に直せて、値が正の有限数の対応表である必要があります"
+    )
+    if entry.value.value is not None and not _is_valid_stay_ratio_map(
+        entry.value.value
+    ):
+        issues.append(
+            ValidationIssue(file=entry.file, path=entry.path, reason=reason_msg)
+        )
+    if entry.value.range is not None:
+        for rk in ("low", "base", "high"):
+            rval = getattr(entry.value.range, rk, None)
+            if rval is not None and not _is_valid_stay_ratio_map(rval):
+                issues.append(
+                    ValidationIssue(
+                        file=entry.file,
+                        path=f"{entry.path}.range.{rk}",
+                        reason=reason_msg,
+                    )
+                )
+    return issues
+
+
 def _validate_labor_shifts_and_premium(
     inputs: StoreInputs,
 ) -> list[ValidationIssue]:
@@ -353,6 +397,8 @@ def _validate_labor_shifts_and_premium(
             issues.extend(_validate_late_night_premium(entry))
         elif entry.path == "part_time_shifts":
             issues.extend(_validate_part_time_shifts(entry))
+        elif entry.path == "lunch_stay_ratio_by_group_size":
+            issues.extend(_validate_lunch_stay_ratio_by_group_size(entry))
     return issues
 
 
