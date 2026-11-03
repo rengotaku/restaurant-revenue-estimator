@@ -1,0 +1,100 @@
+menu_items:
+  lunch:
+    value:
+    - name: 太切りポテトフライ
+      price: 750
+    - name: ザンギ
+      price: 850
+    - name: 生ビール（中）(サッポロクラシック）
+      price: 880
+    - name: エビフライカレー
+      price: 2300
+    - name: ズワイガニのトマトクリームパスタ
+      price: 2600
+    - name: キノコのパスタ
+      price: 1800
+    - name: 肉汁たっぷりハンバーグカレー
+      price: 2300
+    - name: ステーキカレー
+      price: 2500
+    - name: 手羽先揚げ
+      price: 1000
+    - name: ハラミステーキ
+      price: 2600
+    - name: サイコロステーキ
+      price: 2000
+    - name: カフェラテ
+      price: 600
+    - name: タコザンギ
+      price: 900
+    - name: エビフライ(３本)
+      price: 850
+    - name: 生ビール（中）(キリン一番搾り)
+      price: 880
+    - name: ライス
+      price: 350
+    - name: ハンバーグステーキ200ｇ
+      price: 2600
+    - name: ブレンドコーヒー
+      price: 550
+    - name: サーロインステーキ200ｇ
+      price: 3300
+    - name: 温かい緑茶
+      price: 500
+    - name: リブロースステーキ200ｇ
+      price: 4300
+    - name: グラスワイン(白)
+      price: 900
+    - name: 紅茶
+      price: 500
+    - name: 日本酒(熱燗)(1合)
+      price: 700
+    - name: エスプレッソコーヒー
+      price: 550
+    - name: ホットミルク
+      price: 500
+    - name: グラスワイン(赤)
+      price: 900
+    - name: ノンアルコールビール(アサヒドライゼロ)
+      price: 550
+    - name: オホロGIN(グラス)（トニックウォーター)
+      price: 1050
+    - name: 日本酒(冷)( 1合)
+      price: 700
+    - name: 竹鶴ピュアモルト(シングル)(ソーダ)
+      price: 1200
+    - name: 鹿肉ハンバーガー
+      price: 2500
+    - name: ホットウォーター
+      price: 200
+    - name: ホットサンド
+      price: 1200
+    - name: オホロGIN(グラス）(ソーダ)
+      price: 1000
+    - name: 竹鶴ピュアモルト(シングル)(ロック)
+      price: 1200
+    - name: 竹鶴ピュアモルト(ダブル)(ロック)
+      price: 2400
+    - name: 竹鶴ピュアモルト(シングル)(ストレート)
+      price: 1200
+    - name: 竹鶴ピュアモルト(ダブル)(ソーダ)
+      price: 2400
+    - name: カッシェロ・デル・ディアブロ カベルネソーヴィニ
+      price: 4800
+    - name: アラン・ポートレ シャブリ(白)
+      price: 8000
+    - name: ヴーヴクリコ(イエローラベル)(ボトル)
+      price: 24000
+    - name: 竹鶴ピュアモルト(ダブル)(ストレート)
+      price: 2400
+    - name: 竹鶴ピュアモルト(シングル)(水割り)
+      price: 1200
+    - name: カッシェロ・デル・ディアブロ シャルドネ(白）
+      price: 4800
+    - name: オチガビ ヴァン・ブラン・ドゥミ・セック(白)
+      price: 6000
+    unit: yen
+    status: OBSERVED
+    observation_id: OBS-001
+    note: POS の単価（金額 ÷ 数量の最頻値）。税込か税抜かはデータに明記が無い
+courses: {}

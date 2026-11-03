@@ -1,7 +1,8 @@
 url: https://www8.cao.go.jp/chosei/shukujitsu/syukujitsu.csv
 accessed_at: '2026-10-30'
-sha256: e60c826802ac84e255ac047a2614e83b4d7f1572ed26d4c0f5d7cdd58cabd31e
+sha256: eaafc39e7a8faa537e5d0df7b681f86555a0ebbee6bb86a117d004a0ef798d33
 encoding: Shift_JIS
 years:
+- 2023
 - 2026
-note: 2026 年の国民の祝日 18 日。5/6（振替休日）と 9/22（国民の休日）を含む
+note: 2026 年の国民の祝日 18 日と、2023 年の 17 日。2023 年は Tanta an の実績突合に使う

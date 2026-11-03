@@ -1,0 +1,23 @@
+store_id: tanta_an
+name:
+  value: Tanta an（タンタアン）
+  unit: text
+  status: PUBLIC_REPORTED
+  sources:
+  - S01
+address:
+  value: 北海道虻田郡倶知安町 ニセコ東急グラン・ヒラフ内
+  unit: text
+  status: PUBLIC_REPORTED
+  sources:
+  - S01
+  note: データの説明にある「ニセコ東急グラン・ヒラフが運営する Tanta an」。番地は未確認
+listed_seats:
+  value: null
+  unit: seats
+  status: UNRESOLVED
+  candidates:
+    all4: 160
+    mix: 120
+  note: POS の卓ラベルは 40。席数はデータに無い
+  how_to_verify: 現地で卓数と席数を数える

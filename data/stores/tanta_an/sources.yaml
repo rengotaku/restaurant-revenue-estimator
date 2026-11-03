@@ -1,0 +1,10 @@
+sources:
+- id: S01
+  url: https://www.harp.lg.jp/opendata/dataset/1938.html
+  accessed_at: '2026-11-03'
+  facts:
+  - ニセコ東急グラン・ヒラフが運営する「Tanta an」のモバイルオーダー売上データ
+  - 2022-12-20〜2023-02-28 の 71 日、40,310 行
+  - ライセンスは CC BY
+  license_status: allowed
+  body_stored: false

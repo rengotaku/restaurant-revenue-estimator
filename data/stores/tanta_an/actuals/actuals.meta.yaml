@@ -1,0 +1,7 @@
+source_id: S01
+license: CC BY
+url: https://www.harp.lg.jp/opendata/dataset/1938.html
+accessed_at: 2026-11-03
+coverage_note: >-
+  モバイルオーダー経由のみ。ランチのみ。現金支払・キャンセル・仮売上は含めていない。
+  金額が税込か税抜かはデータに明記が無い。
