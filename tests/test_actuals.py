@@ -105,6 +105,16 @@ class TestRejects:
         with pytest.raises(ActualsError, match="列数"):
             load_actuals(store)
 
+    def test_broken_yaml_meta(self, tmp_path: Path) -> None:
+        """YAML の構文エラーでも売上画面を 500 にしない."""
+        store = write_actuals(
+            tmp_path / "s1",
+            "date,revenue_inc_tax\n2023-01-01,1\n",
+            meta="source_id: [\n",
+        )
+        with pytest.raises(ActualsError, match="YAML"):
+            load_actuals(store)
+
     def test_missing_dir(self, tmp_path: Path) -> None:
         with pytest.raises(ActualsError, match="ディレクトリがありません"):
             load_actuals(tmp_path / "nope")

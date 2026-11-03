@@ -75,7 +75,10 @@ def _load_meta(path: Path) -> dict[str, Any]:
             f"実績のメタ情報がありません: {path}。"
             f"{', '.join(META_KEYS)} を書いてください。"
         )
-    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        raise ActualsError(f"メタ情報の YAML を読めません: {path} ({exc})") from exc
     if not isinstance(raw, dict):
         raise ActualsError(f"メタ情報が mapping ではありません: {path}")
 
