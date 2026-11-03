@@ -913,6 +913,8 @@ def test_lost_lunch_weighted_daily_average_with_unequal_weekdays() -> None:
         year=2026,
         replications=1,
         seed=42,
+        # 下の曜日ごとの値は、昼の滞在を組の人数で変えない計算で出したもの (#60)
+        overrides={"lunch_stay_ratio_by_group_size": {1: 1, 2: 1, 3: 1, 4: 1}},
     )
     res = evaluate(DATA, req)[0]
     # 単純平均 (43 + 31 + 16 + 43 + 13) / 5 = 29.2 ではなく、

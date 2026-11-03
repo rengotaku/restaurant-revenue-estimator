@@ -231,6 +231,8 @@ def fit_observation(
     assumptions = inputs.files.get("assumptions/standard.yaml", {}) or {}
     groups = assumptions["lunch_arrival_groups"]
     stays = assumptions["lunch_stay_minutes"]
+    ratio_raw = assumptions.get("lunch_stay_ratio_by_group_size")
+    stay_ratio = plain(ratio_raw) if ratio_raw is not None else None
     rows = fit_grid(
         floor1_tables=floor1,
         candidates=candidates,
@@ -246,6 +248,7 @@ def fit_observation(
         cleanup_minutes=int(plain(assumptions["cleanup_minutes"])),
         max_wait_minutes=int(plain(assumptions["max_wait_minutes"])),
         replications=replications,
+        stay_ratio_by_group_size=stay_ratio,
     )
     typer.echo(
         "観察は 1 回・時刻を選んで見ている。ここで出るのは候補であって推定値ではない。"

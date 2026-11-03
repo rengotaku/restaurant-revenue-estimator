@@ -915,6 +915,7 @@ def _evaluate_variant(
                 close_minute=end,
                 replications=max(1, request.replications),
                 seed=request.seed + index,
+                stay_ratio_by_group_size=values.get("lunch_stay_ratio_by_group_size"),
             )
             lunch_guests_by_weekday[weekday] = round(lunch.guests)
             total_weighted_lost_lunch += lunch.lost * days_for_weekday

@@ -1,6 +1,7 @@
 """昼のモデル: 到着率を作り、卓シミュレーションを replications 回す."""
 
-from collections.abc import Sequence
+import math
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from restaurant_revenue_estimator.engine.tables import (
@@ -59,6 +60,63 @@ def arrival_profile(
     return [total_groups * weight for weight in weights]
 
 
+def lunch_stay_by_group_size(
+    stay_minutes: float,
+    ratios: (
+        Mapping[int, float]
+        | Mapping[str, float]
+        | Mapping[int | str, float]
+    ),
+    group_sizes: Sequence[int],
+    group_probs: Sequence[float],
+) -> dict[int, float]:
+    """組の人数ごとの平均滞在時間を比と分布から計算する.
+
+    m_s = stay_minutes * r_s / (Σ_k p_k r_k / Σ_k p_k)
+    """
+    clean_ratios: dict[int, float] = {}
+    for k, v in ratios.items():
+        try:
+            size = int(k)
+        except (ValueError, TypeError) as err:
+            raise ValueError(
+                f"Ratio key must be convertible to int, got {k!r}"
+            ) from err
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            raise ValueError(f"Ratio value for {k} must be a number, got {v!r}")
+        if not math.isfinite(v) or v <= 0:
+            raise ValueError(
+                f"Ratio value for {k} must be a positive finite number, got {v!r}"
+            )
+        clean_ratios[size] = float(v)
+
+    missing = [s for s in group_sizes if s not in clean_ratios]
+    if missing:
+        raise ValueError(f"Missing ratios for group sizes: {missing}")
+
+    relevant_ratios = [clean_ratios[s] for s in group_sizes]
+    if len(set(relevant_ratios)) <= 1:
+        return {s: float(stay_minutes) for s in group_sizes}
+
+    total_prob = sum(group_probs)
+    if total_prob <= 0:
+        raise ValueError(
+            f"Sum of group probabilities must be positive, got {total_prob}"
+        )
+
+    weighted_r_mean = (
+        sum(
+            p * clean_ratios[s]
+            for s, p in zip(group_sizes, group_probs, strict=True)
+        )
+        / total_prob
+    )
+    return {
+        s: float(stay_minutes * clean_ratios[s] / weighted_r_mean)
+        for s in group_sizes
+    }
+
+
 def simulate_lunch_day(
     *,
     tables: list[Table],
@@ -73,9 +131,20 @@ def simulate_lunch_day(
     close_minute: int = 150,
     replications: int = 20,
     seed: int = 42,
+    stay_ratio_by_group_size: (
+        Mapping[int, float]
+        | Mapping[str, float]
+        | Mapping[int | str, float]
+        | None
+    ) = None,
 ) -> LunchDayResult:
     """1 日分を replications 回まわして平均を出す."""
     rates = arrival_profile(total_groups)
+    stay_by_size = None
+    if stay_ratio_by_group_size is not None:
+        stay_by_size = lunch_stay_by_group_size(
+            stay_minutes, stay_ratio_by_group_size, group_sizes, group_probs
+        )
     results = [
         simulate(
             tables,
@@ -92,6 +161,7 @@ def simulate_lunch_day(
             stay_minutes=stay_minutes,
             stay_spread=max(1, stay_minutes // 8),
             seed=seed + index,
+            stay_by_size=stay_by_size,
         )
         for index in range(replications)
     ]
