@@ -88,6 +88,18 @@ class TestLoadPredictedDays:
         with pytest.raises(BacktestError, match="standard"):
             load_predicted_days(path, scenario="optimistic")
 
+    def test_minimal_document_rejects_other_scenario(self, tmp_path: Path) -> None:
+        """days 直下でも、指定と違うシナリオを黙って返さない."""
+        path = write_run(
+            tmp_path,
+            {
+                "assumption_set": "standard",
+                "days": [{"date": "2023-01-01", "total": 1}],
+            },
+        )
+        with pytest.raises(BacktestError, match="standard"):
+            load_predicted_days(path, scenario="pessimistic")
+
     def test_duplicate_predicted_date(self, tmp_path: Path) -> None:
         path = write_run(
             tmp_path,

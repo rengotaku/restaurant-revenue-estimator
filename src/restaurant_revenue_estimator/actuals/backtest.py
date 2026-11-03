@@ -172,6 +172,11 @@ def _candidate_entries(
         return selected
 
     if isinstance(document.get("days"), list):
+        if top_scenario is not None and top_scenario != scenario:
+            raise BacktestError(
+                f"この日次データは {top_scenario} のものです"
+                f"（scenario {scenario} としては使えません）: {path}"
+            )
         return [document]
 
     raise BacktestError(
