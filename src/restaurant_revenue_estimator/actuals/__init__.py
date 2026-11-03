@@ -7,6 +7,7 @@ from restaurant_revenue_estimator.actuals.backtest import (
     compare,
     load_predicted_days,
     render_markdown,
+    series_from_days,
 )
 from restaurant_revenue_estimator.actuals.loader import load_actuals
 from restaurant_revenue_estimator.actuals.models import (
@@ -26,4 +27,5 @@ __all__ = [
     "load_actuals",
     "load_predicted_days",
     "render_markdown",
+    "series_from_days",
 ]

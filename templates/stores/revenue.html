@@ -47,6 +47,69 @@
 </section>
 {% endif %}
 
+<section class="bg-white rounded-lg shadow p-4 mb-6">
+    <h2 class="font-bold text-gray-800 mb-3">実績との比較</h2>
+    {% if backtest and backtest.result %}
+    {% set bt = backtest.result %}
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-sm">
+        <div>
+            <div class="text-xs text-gray-500">MAE（平均絶対誤差）</div>
+            <div class="font-bold">{{ "{:,}".format(bt.mae) }} 円</div>
+        </div>
+        <div>
+            <div class="text-xs text-gray-500">バイアス（予測 − 実績）</div>
+            <div class="font-bold">{{ "{:+,}".format(bt.bias) }} 円/日</div>
+        </div>
+        <div>
+            <div class="text-xs text-gray-500">相対誤差（合計）</div>
+            <div class="font-bold">{% if bt.relative_error is none %}—{% else %}{{ "{:+.1%}".format(bt.relative_error) }}{% endif %}</div>
+        </div>
+        <div>
+            <div class="text-xs text-gray-500">比較した日数</div>
+            <div class="font-bold">{{ bt.compared_days }} 日</div>
+        </div>
+    </div>
+    <p class="text-xs text-gray-500 mb-3">
+        実績 {{ "{:,}".format(bt.actual_total) }} 円 / 予測 {{ "{:,}".format(bt.predicted_total) }} 円。
+        中央値絶対誤差 {{ "{:,}".format(bt.median_abs_error) }} 円。
+        実績: {{ bt.source_id }}（{{ bt.license }}）{{ bt.actual_period[0] }}〜{{ bt.actual_period[1] }}。{{ bt.coverage_note }}
+    </p>
+    <h3 class="text-sm font-bold text-gray-700 mb-2">誤差の大きい日 上位{{ backtest.worst|length }}日</h3>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-gray-500">
+                <tr>
+                    <th class="px-4 py-2 text-left">日付</th>
+                    <th class="px-4 py-2 text-right">実績</th>
+                    <th class="px-4 py-2 text-right">予測</th>
+                    <th class="px-4 py-2 text-right">差</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for row in backtest.worst %}
+                <tr>
+                    <td class="px-4 py-2">{{ row.day }}</td>
+                    <td class="px-4 py-2 text-right">{{ "{:,}".format(row.actual) }}</td>
+                    <td class="px-4 py-2 text-right">{{ "{:,}".format(row.predicted) }}</td>
+                    <td class="px-4 py-2 text-right">{{ "{:+,}".format(row.diff) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="text-xs text-gray-500 mt-2">
+        1 店舗・1 期間の比較であり、これだけで予測精度を主張しない。3 シナリオは予測区間ではないため、区間被覆率は出していない。
+    </p>
+    {% elif backtest and backtest.note %}
+    <p class="text-sm text-amber-700">{{ backtest.note }}</p>
+    {% else %}
+    <p class="text-sm text-gray-500">
+        実績が未投入です。<code class="text-xs bg-gray-100 px-1 rounded">data/stores/{{ store_id }}/actuals/</code> に
+        CSV（date, revenue_inc_tax）と actuals.meta.yaml を置くと、この画面に誤差が出ます。
+    </p>
+    {% endif %}
+</section>
+
 <div class="bg-white rounded-lg shadow p-4 mb-6">
     <canvas id="revenue-chart" height="110"></canvas>
 </div>

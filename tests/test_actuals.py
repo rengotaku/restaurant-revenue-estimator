@@ -97,6 +97,14 @@ class TestRejects:
         with pytest.raises(ActualsError, match="未知の列"):
             load_actuals(store)
 
+    def test_unquoted_thousands_separator(self, tmp_path: Path) -> None:
+        """引用なしの桁区切りを 1 円として読まない."""
+        store = write_actuals(
+            tmp_path / "s1", "date,revenue_inc_tax\n2023-01-01,1,000\n"
+        )
+        with pytest.raises(ActualsError, match="列数"):
+            load_actuals(store)
+
     def test_missing_dir(self, tmp_path: Path) -> None:
         with pytest.raises(ActualsError, match="ディレクトリがありません"):
             load_actuals(tmp_path / "nope")

@@ -10,6 +10,7 @@ replications の分布を日次で保存できるようになってから計算�
 
 import json
 import statistics
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -29,6 +30,7 @@ class PredictedSeries:
     scenario: str
     variant: str
     days: dict[date, int]
+    store_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -128,15 +130,31 @@ def load_predicted_days(
         scenario=str(chosen.get("assumption_set") or scenario),
         variant=str(chosen.get("name") or chosen.get("variant") or "default"),
         days=days,
+        store_id=str(document["store_id"]) if document.get("store_id") else None,
     )
 
 
 def _candidate_entries(
     document: dict[str, Any], scenario: str, path: Path
 ) -> list[dict[str, Any]]:
-    raw = document.get("scenarios")
-    if isinstance(raw, list) and raw:
-        entries = [entry for entry in raw if isinstance(entry, dict)]
+    """日次売上を持つ候補を返す.
+
+    `rre run` の `result.json` は日次売上を `variants` にだけ持ち、
+    `scenarios` は年間集計だけを保存する。そのため `variants` を先に見る。
+    """
+    top_scenario = document.get("assumption_set")
+    raw_variants = document.get("variants")
+    if isinstance(raw_variants, list) and raw_variants:
+        if top_scenario is None or top_scenario == scenario:
+            return [entry for entry in raw_variants if isinstance(entry, dict)]
+        raise BacktestError(
+            f"この run は {top_scenario} の日次売上だけを持ちます"
+            f"（scenario {scenario} の日次はありません）: {path}"
+        )
+
+    raw_scenarios = document.get("scenarios")
+    if isinstance(raw_scenarios, list) and raw_scenarios:
+        entries = [entry for entry in raw_scenarios if isinstance(entry, dict)]
         selected = [
             entry for entry in entries if entry.get("assumption_set") == scenario
         ]
@@ -146,16 +164,12 @@ def _candidate_entries(
                 f"scenario {scenario!r} が run にありません: {path}。"
                 f"利用できるのは {', '.join(available)} です。"
             )
-        return selected
-
-    raw = document.get("variants")
-    if isinstance(raw, list) and raw:
-        entries = [entry for entry in raw if isinstance(entry, dict)]
-        if scenario != "standard":
+        if not all(isinstance(entry.get("days"), list) for entry in selected):
             raise BacktestError(
-                f"variants だけを持つ run は scenario {scenario!r} を選べません: {path}"
+                f"scenario {scenario!r} の日次売上が run に保存されていません"
+                f"（年間集計だけ）: {path}"
             )
-        return entries
+        return selected
 
     if isinstance(document.get("days"), list):
         return [document]
@@ -186,27 +200,58 @@ def _read_days(entry: dict[str, Any], path: Path) -> dict[date, int]:
     raw_days = entry.get("days")
     if not isinstance(raw_days, list):
         raise BacktestError(f"日次売上の配列がありません: {path}")
+    return _parse_days(raw_days, str(path))
 
+
+def series_from_days(
+    days: Iterable[dict[str, Any]],
+    *,
+    scenario: str,
+    variant: str,
+    store_id: str | None = None,
+    where: str = "run",
+) -> PredictedSeries:
+    """画面など、JSON を経由せずに日次売上から系列を作る."""
+    parsed = _parse_days(list(days), where)
+    if not parsed:
+        raise BacktestError(f"日次売上が空です: {where}")
+    return PredictedSeries(
+        scenario=scenario, variant=variant, days=parsed, store_id=store_id
+    )
+
+
+def _parse_days(raw_days: list[Any], where: str) -> dict[date, int]:
     days: dict[date, int] = {}
     for row in raw_days:
         if not isinstance(row, dict):
-            raise BacktestError(f"日次売上の要素が object ではありません: {path}")
+            raise BacktestError(f"日次売上の要素が object ではありません: {where}")
         raw_date = row.get("date")
         total = row.get("total", row.get("total_inc_tax"))
         if raw_date is None or total is None:
-            raise BacktestError(f"日次売上に date / total がありません: {row} ({path})")
+            raise BacktestError(
+                f"日次売上に date / total がありません: {row} ({where})"
+            )
         try:
             day = date.fromisoformat(str(raw_date))
         except ValueError as exc:
-            raise BacktestError(f"日付を解釈できません: {raw_date!r} ({path})") from exc
+            raise BacktestError(
+                f"日付を解釈できません: {raw_date!r} ({where})"
+            ) from exc
         if day in days:
-            raise BacktestError(f"予測の日付が重複しています: {day} ({path})")
+            raise BacktestError(f"予測の日付が重複しています: {day} ({where})")
         days[day] = int(total)
     return days
 
 
 def compare(actual: ActualSeries, predicted: PredictedSeries) -> BacktestResult:
     """重なる日だけで指標を出す. 重なる日が無ければ BacktestError."""
+    if actual.store_id and predicted.store_id and actual.store_id != predicted.store_id:
+        raise BacktestError(
+            f"実績の店舗 {actual.store_id} と run の店舗 {predicted.store_id} "
+            "が違います。別店舗の run を突き合わせると、"
+            "店舗名だけ実績側の結果が出ます。"
+        )
+
     common = sorted(set(actual.by_day) & set(predicted.days))
     if not common:
         first_actual, last_actual = actual.period

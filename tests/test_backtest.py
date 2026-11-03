@@ -16,13 +16,13 @@ from restaurant_revenue_estimator.actuals import (
 )
 
 
-def make_actual(*revenues: int) -> ActualSeries:
+def make_actual(*revenues: int, store_id: str = "s1") -> ActualSeries:
     days = tuple(
         ActualDay(day=date(2023, 1, index + 1), revenue_inc_tax=value)
         for index, value in enumerate(revenues)
     )
     return ActualSeries(
-        store_id="s1",
+        store_id=store_id,
         days=days,
         source_id="S99",
         license="CC BY 4.0",
@@ -101,6 +101,58 @@ class TestLoadPredictedDays:
         with pytest.raises(BacktestError, match="重複"):
             load_predicted_days(path)
 
+    def test_real_run_document_reads_variants(self, tmp_path: Path) -> None:
+        """`rre run` の result.json は variants にだけ日次を持つ."""
+        path = write_run(
+            tmp_path,
+            {
+                "store_id": "s1",
+                "assumption_set": "standard",
+                "scenarios": [
+                    {
+                        "assumption_set": "standard",
+                        "variant": "v1",
+                        "gross_inc_tax": 1000,
+                    }
+                ],
+                "variants": [
+                    {
+                        "name": "v1",
+                        "assumption_set": "standard",
+                        "days": [{"date": "2023-01-01", "total": 1000}],
+                    }
+                ],
+            },
+        )
+        series = load_predicted_days(path, scenario="standard")
+        assert series.days[date(2023, 1, 1)] == 1000
+        assert series.store_id == "s1"
+
+    def test_scenario_without_days_is_rejected(self, tmp_path: Path) -> None:
+        """年間集計だけの scenario を日次として読まない."""
+        path = write_run(
+            tmp_path,
+            {
+                "assumption_set": "standard",
+                "scenarios": [
+                    {
+                        "assumption_set": "pessimistic",
+                        "variant": "v1",
+                        "gross_inc_tax": 1000,
+                    }
+                ],
+                "variants": [
+                    {
+                        "name": "v1",
+                        "assumption_set": "standard",
+                        "days": [{"date": "2023-01-01", "total": 1000}],
+                    }
+                ],
+            },
+        )
+        with pytest.raises(BacktestError, match="日次"):
+            load_predicted_days(path, scenario="pessimistic")
+
 
 class TestCompare:
     """指標の計算."""
@@ -152,6 +204,21 @@ class TestCompare:
             write_run(tmp_path, {"days": [{"date": "2023-01-01", "total": 10}]})
         )
         assert compare(actual, predicted).relative_error is None
+
+    def test_different_store_is_rejected(self, tmp_path: Path) -> None:
+        """別店舗の run を実績に突き合わせない."""
+        actual = make_actual(1000, store_id="s1")
+        predicted = load_predicted_days(
+            write_run(
+                tmp_path,
+                {
+                    "store_id": "s2",
+                    "days": [{"date": "2023-01-01", "total": 1000}],
+                },
+            )
+        )
+        with pytest.raises(BacktestError, match="店舗"):
+            compare(actual, predicted)
 
 
 class TestRender:

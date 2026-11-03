@@ -28,6 +28,7 @@ description: 実績は data/stores/<store_id>/actuals/ に CSV とメタ情報�
 - 3 シナリオ（悲観・標準・楽観）を予測区間として使わない。**区間被覆率は出さない**（ADR 0008 と同じ理由。帯や誤差棒で見せると予測区間に見える）。replications の分布を日次で保存できるようになってから足す
 - 実績は入力 YAML（`ProvenancedValue`）に混ぜない。実績は「値 + 出典」ではなく時系列で、スキーマが違う
 - 1 店舗・1 期間の比較では精度を主張しない。レポートの冒頭にその注記を必ず出す
+- 売上画面に「実績との比較」を出し、実績が無い店舗では置き場所だけ案内する（空欄にしない）
 
 ## 捨てた案
 
@@ -41,6 +42,8 @@ description: 実績は data/stores/<store_id>/actuals/ に CSV とメタ情報�
 - `tests/test_actuals.py`: メタ情報の必須キー、日付の重複、負の売上、未知の列で停止する
 - `tests/test_backtest.py`: 指標の計算、重なる日だけの比較、重なる日が無いときのエラー、相対誤差の 0 除算
 - `tests/test_cli.py`: `rre backtest` の Markdown / `--json` / 終了コード
+- `tests/test_backtest_view.py`: 実績が無い・日次が空・店舗違い・重なる日なし・メタ不備で、画面用の組み立てが落ちないこと
+- `tests/test_screens.py`: 売上画面に「実績との比較」が出ること
 
 ## 変えてよい前提 / 壊すと危ない前提
 

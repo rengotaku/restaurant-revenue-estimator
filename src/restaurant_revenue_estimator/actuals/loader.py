@@ -105,7 +105,15 @@ def _read_csv(path: Path) -> list[tuple[ActualDay, int]]:
                 f"実績 CSV に未知の列があります: {', '.join(unknown)} ({path})。"
                 "列を増やすと集計の意味が変わるため、意図した列かを確認してください。"
             )
-        return [_parse_row(row, path, line_no) for line_no, row in enumerate(reader, 2)]
+        parsed: list[tuple[ActualDay, int]] = []
+        for line_no, row in enumerate(reader, 2):
+            if None in row:
+                raise ActualsError(
+                    f"列数がヘッダーより多い行があります（{path}:{line_no}）。"
+                    '金額に桁区切りを入れるなら "1,000" と引用してください。'
+                )
+            parsed.append(_parse_row(row, path, line_no))
+        return parsed
 
 
 def _parse_row(
