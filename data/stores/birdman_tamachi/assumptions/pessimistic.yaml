@@ -18,6 +18,16 @@ lunch_arrival_groups:
     high: 60
   how_to_verify: 12:00-12:30 の入店組数を 3 日分数える
   value: 30
+lunch_arrival_weekday_factor:
+  unit: ratio
+  status: ASSUMPTION
+  justification: Google マップの混雑度（2026-11-01 取得、昼 11〜13 時の合計。月 170・水 216・木 242・金 246、火はデータなし）を 4 曜日の平均 218.5 で割った倍率。火は 1。lunch_arrival_groups（平日の平均の組数）に掛けて曜日ごとの組数にする。混雑度は店にいた人の多さで入店数ではなく、取得は 1 回だけ
+  range:
+    low: {mon: 1, tue: 1, wed: 1, thu: 1, fri: 1}
+    base: {mon: 0.778, tue: 1.0, wed: 0.989, thu: 1.108, fri: 1.126}
+    high: {mon: 0.778, tue: 1.0, wed: 0.989, thu: 1.108, fri: 1.126}
+  how_to_verify: 12:00-12:30 の入店組数を、曜日ごとに 3 日分数える
+  value: {mon: 0.778, tue: 1.0, wed: 0.989, thu: 1.108, fri: 1.126}
 group_size_distribution:
   unit: ratio
   status: ASSUMPTION

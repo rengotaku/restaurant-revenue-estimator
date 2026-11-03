@@ -22,6 +22,32 @@ class LunchDayResult:
     occupied_people: tuple[float, ...] = ()
 
 
+VALID_WEEKDAYS = frozenset({"mon", "tue", "wed", "thu", "fri", "sat", "sun"})
+
+
+def lunch_arrival_groups_for_weekday(
+    groups: float,
+    factors: Mapping[str, float] | None,
+    weekday: str,
+) -> float:
+    """曜日ごとの昼の到着組数を計算する."""
+    if factors is None:
+        return groups
+
+    for k, v in factors.items():
+        if k not in VALID_WEEKDAYS:
+            raise ValueError(f"Invalid weekday key: {k!r}")
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            raise ValueError(f"Factor value for {k} must be a number, got {v!r}")
+        if not math.isfinite(v) or v <= 0:
+            raise ValueError(
+                f"Factor value for {k} must be a positive finite number, got {v!r}"
+            )
+
+    factor = factors.get(weekday, 1)
+    return groups * factor
+
+
 def lunch_occupancy_stats(
     occupied_people: Sequence[float],
 ) -> tuple[float, float]:

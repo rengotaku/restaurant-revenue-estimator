@@ -318,6 +318,9 @@ def test_case_6_evaluation_lunch_stay_ratio() -> None:
         overrides={
             "layout.floor2": "f2_42",
             "lunch_stay_ratio_by_group_size": {1: 1, 2: 1, 3: 1, 4: 1},
+            "lunch_arrival_weekday_factor": {
+                "mon": 1, "tue": 1, "wed": 1, "thu": 1, "fri": 1
+            },
         },
     )
     res_override = evaluate(data_dir, req_override)[0]
@@ -335,7 +338,12 @@ def test_case_6_evaluation_lunch_stay_ratio() -> None:
         assumption_set="standard",
         seed=42,
         replications=5,
-        overrides={"layout.floor2": "f2_42"},
+        overrides={
+            "layout.floor2": "f2_42",
+            "lunch_arrival_weekday_factor": {
+                "mon": 1, "tue": 1, "wed": 1, "thu": 1, "fri": 1
+            },
+        },
     )
     res_standard = evaluate(data_dir, req_standard)[0]
     assert sum(res_standard.lunch_guests_by_weekday.values()) > sum(
