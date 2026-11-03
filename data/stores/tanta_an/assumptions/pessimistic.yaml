@@ -1,0 +1,657 @@
+lunch_avg_ticket:
+  unit: yen
+  status: ASSUMPTION
+  justification: POS の会計あたり 4,375 円を、仮置きの平均人数 2.2 で割った 1 人あたり。人数はデータに無い
+  range:
+    low: 1800
+    base: 1989
+    high: 2300
+  how_to_verify: 会計あたりの人数を 1 週間分数える
+  value: 1800
+lunch_arrival_groups:
+  unit: groups
+  status: ASSUMPTION
+  justification: POS の会計数 9,553 ÷ 71 日 = 134.5。1 会計 = 1 組とみなす仮定
+  range:
+    low: 110
+    base: 135
+    high: 160
+  how_to_verify: 入店組数を 3 日分数える
+  value: 110
+lunch_arrival_weekday_factor:
+  unit: ratio
+  status: ASSUMPTION
+  justification: POS の曜日別日商 ÷ 全曜日の平均。71 日・各曜日 10〜11 日
+  range:
+    low: &id001
+      mon: 1.032
+      tue: 0.957
+      wed: 0.992
+      thu: 0.986
+      fri: 0.936
+      sat: 1.006
+      sun: 1.09
+    base: *id001
+    high: *id001
+  how_to_verify: 曜日ごとの会計数を 4 週間分集計する
+  value: *id001
+group_size_distribution:
+  unit: ratio
+  status: ASSUMPTION
+  justification: POS に人数が無い。平均 1.95〜2.4 人になるように置いた仮定
+  range:
+    low:
+      '1': 0.3
+      '2': 0.5
+      '3': 0.15
+      '4': 0.05
+    base:
+      '1': 0.2
+      '2': 0.5
+      '3': 0.2
+      '4': 0.1
+    high:
+      '1': 0.15
+      '2': 0.45
+      '3': 0.25
+      '4': 0.15
+  how_to_verify: 入店する組の人数を 30 組分数える
+  value:
+    '1': 0.3
+    '2': 0.5
+    '3': 0.15
+    '4': 0.05
+lunch_stay_minutes:
+  unit: minutes
+  status: ASSUMPTION
+  justification: POS に滞在時間が無い。スキー場のランチとして置いた仮定
+  range:
+    low: 35
+    base: 45
+    high: 60
+  how_to_verify: 着席から退店までを 10 組分測る
+  value: 35
+lunch_stay_ratio_by_group_size:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 人数による滞在差は未確認。差を付けない
+  range:
+    low:
+      '1': 1
+      '2': 1
+      '3': 1
+      '4': 1
+    base:
+      '1': 1
+      '2': 1
+      '3': 1
+      '4': 1
+    high:
+      '1': 1
+      '2': 1
+      '3': 1
+      '4': 1
+  how_to_verify: 組の人数ごとの滞在時間を測る
+  value:
+    '1': 1
+    '2': 1
+    '3': 1
+    '4': 1
+cleanup_minutes:
+  unit: minutes
+  status: ASSUMPTION
+  justification: 仮置き
+  range:
+    low: 3
+    base: 5
+    high: 8
+  how_to_verify: 片付けの時間を 10 回測る
+  value: 3
+max_wait_minutes:
+  unit: minutes
+  status: ASSUMPTION
+  justification: 仮置き
+  range:
+    low: 5
+    base: 10
+    high: 20
+  how_to_verify: 行列に並ぶ上限を聞く
+  value: 5
+dinner_demand_by_weekday:
+  unit: people/day
+  status: ASSUMPTION
+  justification: v5 の曜日別仮定（spec 3.2-3）の金曜 61 人に合わせ、月・水・木を Google マップの混雑度（2026-11-01
+    取得、夜 17〜22 時の合計の曜日比）で置いた仮置き。火曜は混雑度にデータが無いため直線で補った値のまま。low/high は base の 0.7 倍・1.3
+    倍。来店を希望した人数（入店できなかった分は失った需要）
+  range:
+    low: &id002
+      mon: 26
+      tue: 28
+      wed: 33
+      thu: 25
+      fri: 43
+      sat: 0
+      sun: 0
+    base:
+      mon: 37
+      tue: 40
+      wed: 47
+      thu: 35
+      fri: 61
+      sat: 0
+      sun: 0
+    high:
+      mon: 48
+      tue: 52
+      wed: 61
+      thu: 46
+      fri: 79
+      sat: 0
+      sun: 0
+  how_to_verify: 曜日別の夜の入店客数を POS で 1 か月分集計する
+  value: *id002
+dinner_seasonality:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 12 月が最も高く 2 月が最も低いという調査（S18）を参考にした仮置き。月別指数は非公開
+  range:
+    low: &id003
+    - 0.9025
+    - 0.855
+    - 0.9215
+    - 0.95
+    - 0.969
+    - 0.95
+    - 0.9785
+    - 0.95
+    - 0.95
+    - 0.95
+    - 0.9975
+    - 1.0925
+    base:
+    - 0.95
+    - 0.9
+    - 0.97
+    - 1.0
+    - 1.02
+    - 1.0
+    - 1.03
+    - 1.0
+    - 1.0
+    - 1.0
+    - 1.05
+    - 1.15
+    high:
+    - 0.9975
+    - 0.945
+    - 1.0185
+    - 1.05
+    - 1.071
+    - 1.05
+    - 1.0815
+    - 1.05
+    - 1.05
+    - 1.05
+    - 1.1025
+    - 1.2075
+  how_to_verify: 月別の客数を 1 年分集計する
+  value: *id003
+dinner_ala_ticket:
+  unit: yen
+  status: ASSUMPTION
+  justification: spec 9.5 の仮置き。食べログの夜予算 4,000〜4,999 円の範囲
+  range:
+    low: 4000
+    base: 4500
+    high: 5000
+  how_to_verify: 夜のアラカルト客の客単価を POS で集計する
+  value: 4000
+course_ratio:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 根拠なし。幅を広く取って感度で見る
+  range:
+    low: 0.1
+    base: 0.25
+    high: 0.5
+  how_to_verify: コース予約の組数と人数を 1 か月分集計する
+  value: 0.1
+discount_application_rate:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 仮置き。通常価格と割引価格のどちらで予約されたかの比率
+  range:
+    low: 0.5
+    base: 0.8
+    high: 1.0
+  how_to_verify: 予約時のコース価格の内訳を確認する
+  value: 1.0
+cost_rate_ala:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 業態が違うため公庫の値をそのままは使えない。仮置き
+  range:
+    low: 0.28
+    base: 0.32
+    high: 0.36
+  how_to_verify: 仕入額と売上の比率を 1 か月分集計する
+  value: 0.28
+cost_rate_course:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 公庫の原価率 32.2% の近辺。コースも同じ率と仮置き
+  range:
+    low: 0.28
+    base: 0.32
+    high: 0.36
+  how_to_verify: コースの仕入額を 1 か月分集計する
+  value: 0.36
+rent_monthly:
+  unit: yen/month
+  status: ASSUMPTION
+  justification: 賃料は非公開。スキー場内の区画として置いた仮定
+  range:
+    low: 400000
+    base: 800000
+    high: 1500000
+  how_to_verify: 賃貸契約書で確認する
+  value: 400000
+other_expenses_monthly:
+  unit: yen/month
+  status: ASSUMPTION
+  justification: 光熱費・カード手数料・消耗品・広告・保険・通信・会計の仮置き
+  range:
+    low:
+      utilities: 96000
+      card_fee: 48000
+      supplies: 40000
+      advertising: 32000
+      insurance: 16000
+      telecom: 16000
+      accounting: 24000
+    base:
+      utilities: 120000
+      card_fee: 60000
+      supplies: 50000
+      advertising: 40000
+      insurance: 20000
+      telecom: 20000
+      accounting: 30000
+    high:
+      utilities: 144000
+      card_fee: 72000
+      supplies: 60000
+      advertising: 48000
+      insurance: 24000
+      telecom: 24000
+      accounting: 36000
+  how_to_verify: 直近 3 か月の請求書で費目別に確認する
+  value:
+    utilities: 144000
+    card_fee: 72000
+    supplies: 60000
+    advertising: 48000
+    insurance: 24000
+    telecom: 24000
+    accounting: 36000
+owner_hours_monthly:
+  unit: hours/month
+  status: ASSUMPTION
+  justification: 仮置き
+  range:
+    low: 160
+    base: 200
+    high: 240
+  how_to_verify: 1 週間の稼働時間を記録する
+  value: 160
+owner_virtual_wage:
+  unit: yen/hour
+  status: ASSUMPTION
+  justification: 仮置き。店主の労働を時給に換算する単価
+  range:
+    low: 1500
+    base: 2000
+    high: 2500
+  how_to_verify: 同等の職務の求人時給を確認する
+  value: 1500
+full_time_staff:
+  unit: staff
+  status: ASSUMPTION
+  justification: 公開情報に無い。仮置き
+  range:
+    low:
+    - role: 店長
+      count: 1
+      monthly_salary: 280000
+    base:
+    - role: 店長
+      count: 1
+      monthly_salary: 300000
+    high:
+    - role: 店長
+      count: 1
+      monthly_salary: 320000
+    - role: 調理
+      count: 1
+      monthly_salary: 300000
+  how_to_verify: 求人票・聞き取りで確認する
+  value:
+  - role: 店長
+    count: 1
+    monthly_salary: 280000
+part_time_shifts:
+  unit: shifts
+  status: ASSUMPTION
+  justification: 公開情報に無い。ランチのみの仮置き
+  range:
+    low: &id004
+    - id: lunch
+      weekdays:
+      - mon
+      - tue
+      - wed
+      - thu
+      - fri
+      - sat
+      - sun
+      service: lunch
+      start: '10:30'
+      end: '14:30'
+      heads: 1
+      hourly_wage: 1280
+    base:
+    - id: lunch
+      weekdays:
+      - mon
+      - tue
+      - wed
+      - thu
+      - fri
+      - sat
+      - sun
+      service: lunch
+      start: '10:30'
+      end: '15:00'
+      heads: 2
+      hourly_wage: 1280
+    high:
+    - id: lunch
+      weekdays:
+      - mon
+      - tue
+      - wed
+      - thu
+      - fri
+      - sat
+      - sun
+      service: lunch
+      start: '10:00'
+      end: '15:30'
+      heads: 3
+      hourly_wage: 1400
+  how_to_verify: シフト表を見せてもらう
+  value: *id004
+late_night_premium:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 労働基準法の深夜割増 25% 以上
+  range:
+    low: 1.25
+    base: 1.25
+    high: 1.25
+  how_to_verify: 就業規則や給与規定を確認する
+  value: 1.25
+statutory_benefit_rate:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 公開情報に無い。仮置き
+  range:
+    low: 0.13
+    base: 0.15
+    high: 0.17
+  how_to_verify: 決算書の法定福利費比率を確認する
+  value: 0.17
+bonus_months_per_year:
+  unit: months
+  status: ASSUMPTION
+  justification: 公開情報に無い。仮置き
+  range:
+    low: 0
+    base: 0
+    high: 1
+  how_to_verify: 就業規則や求人票の賞与実績を確認する
+  value: 1
+commuting_monthly_per_full_time:
+  unit: yen/month
+  status: ASSUMPTION
+  justification: 公開情報に無い。仮置き
+  range:
+    low: 0
+    base: 10000
+    high: 20000
+  how_to_verify: 従業員の通勤経路と定期代を確認する
+  value: 20000
+commuting_per_part_time_shift:
+  unit: yen/shift
+  status: ASSUMPTION
+  justification: 公開情報に無い。仮置き
+  range:
+    low: 0
+    base: 500
+    high: 1000
+  how_to_verify: 交通費支給規定や求人票を確認する
+  value: 1000
+independence_cost_monthly:
+  unit: yen/month
+  status: ASSUMPTION
+  justification: 本部機能（経理・採用・予約システム）を自前でまかなう費用の仮置き（spec 1.2）
+  range:
+    low: 50000
+    base: 80000
+    high: 120000
+  how_to_verify: 外注見積もりを取る
+  value: 120000
+depreciation_monthly:
+  unit: yen/month
+  status: ASSUMPTION
+  justification: 設備投資の仮置き。年数で割った月額
+  range:
+    low: 0
+    base: 50000
+    high: 100000
+  how_to_verify: 設備の取得価額と耐用年数を確認する
+  value: 100000
+loan_principal_monthly:
+  unit: yen/month
+  status: ASSUMPTION
+  justification: 借入の仮置き。元本返済は CF だけに効く
+  range:
+    low: 0
+    base: 100000
+    high: 150000
+  how_to_verify: 借入契約の返済予定表を確認する
+  value: 150000
+loan_interest_monthly:
+  unit: yen/month
+  status: ASSUMPTION
+  justification: 借入利息の仮置き
+  range:
+    low: 0
+    base: 10000
+    high: 20000
+  how_to_verify: 借入契約の利率を確認する
+  value: 20000
+capex_monthly:
+  unit: yen/month
+  status: ASSUMPTION
+  justification: 設備投資の仮置き。既定は 0
+  range:
+    low: 0
+    base: 0
+    high: 50000
+  how_to_verify: 設備投資の予定を確認する
+  value: 50000
+dinner_stay_minutes:
+  unit: minutes
+  status: ASSUMPTION
+  justification: 仮置き。飲み放題なしのアラカルト客の滞在
+  range:
+    low: 90
+    base: 120
+    high: 150
+  how_to_verify: 夜のアラカルト客の退店時刻を 20 組分記録する
+  value: 150
+dinner_peak_share:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 仮置き。ウォークインの到着のうち 18:30〜19:30 に来る割合
+  range:
+    low: 0.4
+    base: 0.5
+    high: 0.6
+  how_to_verify: 18:30-19:30 のウォークイン来店組数を数える
+  value: 0.6
+dinner_group_size_distribution:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 仮置き。ウォークインは 1〜4 人。5 人以上は予約で来る前提
+  range:
+    low: &id005
+      1: 0.2
+      2: 0.5
+      3: 0.15
+      4: 0.15
+    base:
+      1: 0.15
+      2: 0.45
+      3: 0.2
+      4: 0.2
+    high:
+      1: 0.1
+      2: 0.4
+      3: 0.25
+      4: 0.25
+  how_to_verify: 夜のウォークインの組人数を 30 組分数える
+  value: *id005
+course_party_size_distribution:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 仮置き。コース予約 1 組の人数
+  range:
+    low:
+      4: 0.6
+      6: 0.3
+      10: 0.1
+    base: &id006
+      4: 0.5
+      6: 0.3
+      10: 0.2
+    high:
+      4: 0.4
+      6: 0.3
+      10: 0.3
+  how_to_verify: コース予約の組人数を集計する
+  value: *id006
+course_start_window:
+  unit: time
+  status: ASSUMPTION
+  justification: 仮置き。コース予約の開始時刻の範囲（5 分刻みで一様）
+  range:
+    low:
+      start: '18:00'
+      end: '19:30'
+    base: &id007
+      start: '18:00'
+      end: '19:30'
+    high:
+      start: '18:00'
+      end: '19:30'
+  how_to_verify: コース予約の開始時刻を記録する
+  value: *id007
+course_ratio_month_effect:
+  unit: logit
+  status: ASSUMPTION
+  justification: 仮置き。月による違いは無いものを base に置く
+  range:
+    low: &id008
+    - -0.5
+    - -0.5
+    - -0.5
+    - -0.5
+    - -0.5
+    - -0.5
+    - -0.5
+    - -0.5
+    - -0.5
+    - -0.5
+    - -0.5
+    - -0.5
+    base:
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    high:
+    - 0.5
+    - 0.5
+    - 0.5
+    - 0.5
+    - 0.5
+    - 0.5
+    - 0.5
+    - 0.5
+    - 0.5
+    - 0.5
+    - 0.5
+    - 0.5
+  how_to_verify: 月別のコース比率を集計する
+  value: *id008
+course_ratio_weekday_effect:
+  unit: logit
+  status: ASSUMPTION
+  justification: 仮置き。曜日による違いは無いものを base に置く
+  range:
+    low: &id009
+      mon: -0.5
+      tue: -0.5
+      wed: -0.5
+      thu: -0.5
+      fri: -0.5
+      sat: -0.5
+      sun: -0.5
+    base:
+      mon: 0.0
+      tue: 0.0
+      wed: 0.0
+      thu: 0.0
+      fri: 0.0
+      sat: 0.0
+      sun: 0.0
+    high:
+      mon: 0.5
+      tue: 0.5
+      wed: 0.5
+      thu: 0.5
+      fri: 0.5
+      sat: 0.5
+      sun: 0.5
+  how_to_verify: 曜日別のコース比率を集計する
+  value: *id009
+course_extension_rate:
+  unit: ratio
+  status: ASSUMPTION
+  justification: 仮置き。延長できる日に 2.5 時間へ延ばす組の割合。金曜・祝前日は使わない
+  range:
+    low: 0.0
+    base: 0.3
+    high: 0.6
+  how_to_verify: コース延長の利用組数を数える
+  value: 0.6

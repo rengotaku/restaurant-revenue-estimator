@@ -1,0 +1,181 @@
+floors:
+- id: 1f
+  name: 店内
+  open_policy:
+    value: always
+    unit: policy
+    status: ASSUMPTION
+    justification: 1 フロアしかデータが無い
+    range:
+      low: always
+      base: always
+      high: always
+  tables:
+    value: null
+    unit: tables
+    status: UNRESOLVED
+    candidates:
+      all4:
+      - id: t1
+        seats: 4
+      - id: t2
+        seats: 4
+      - id: t3
+        seats: 4
+      - id: t4
+        seats: 4
+      - id: t5
+        seats: 4
+      - id: t6
+        seats: 4
+      - id: t7
+        seats: 4
+      - id: t8
+        seats: 4
+      - id: t9
+        seats: 4
+      - id: t10
+        seats: 4
+      - id: t11
+        seats: 4
+      - id: t12
+        seats: 4
+      - id: t13
+        seats: 4
+      - id: t14
+        seats: 4
+      - id: t15
+        seats: 4
+      - id: t16
+        seats: 4
+      - id: t17
+        seats: 4
+      - id: t18
+        seats: 4
+      - id: t19
+        seats: 4
+      - id: t20
+        seats: 4
+      - id: t21
+        seats: 4
+      - id: t22
+        seats: 4
+      - id: t23
+        seats: 4
+      - id: t24
+        seats: 4
+      - id: t25
+        seats: 4
+      - id: t26
+        seats: 4
+      - id: t27
+        seats: 4
+      - id: t28
+        seats: 4
+      - id: t29
+        seats: 4
+      - id: t30
+        seats: 4
+      - id: t31
+        seats: 4
+      - id: t32
+        seats: 4
+      - id: t33
+        seats: 4
+      - id: t34
+        seats: 4
+      - id: t35
+        seats: 4
+      - id: t36
+        seats: 4
+      - id: t37
+        seats: 4
+      - id: t38
+        seats: 4
+      - id: t39
+        seats: 4
+      - id: t40
+        seats: 4
+      mix:
+      - id: t1
+        seats: 4
+      - id: t2
+        seats: 2
+      - id: t3
+        seats: 4
+      - id: t4
+        seats: 2
+      - id: t5
+        seats: 4
+      - id: t6
+        seats: 2
+      - id: t7
+        seats: 4
+      - id: t8
+        seats: 2
+      - id: t9
+        seats: 4
+      - id: t10
+        seats: 2
+      - id: t11
+        seats: 4
+      - id: t12
+        seats: 2
+      - id: t13
+        seats: 4
+      - id: t14
+        seats: 2
+      - id: t15
+        seats: 4
+      - id: t16
+        seats: 2
+      - id: t17
+        seats: 4
+      - id: t18
+        seats: 2
+      - id: t19
+        seats: 4
+      - id: t20
+        seats: 2
+      - id: t21
+        seats: 4
+      - id: t22
+        seats: 2
+      - id: t23
+        seats: 4
+      - id: t24
+        seats: 2
+      - id: t25
+        seats: 4
+      - id: t26
+        seats: 2
+      - id: t27
+        seats: 4
+      - id: t28
+        seats: 2
+      - id: t29
+        seats: 4
+      - id: t30
+        seats: 2
+      - id: t31
+        seats: 4
+      - id: t32
+        seats: 2
+      - id: t33
+        seats: 4
+      - id: t34
+        seats: 2
+      - id: t35
+        seats: 4
+      - id: t36
+        seats: 2
+      - id: t37
+        seats: 4
+      - id: t38
+        seats: 2
+      - id: t39
+        seats: 4
+      - id: t40
+        seats: 2
+    note: POS の卓ラベルは 40。席数はデータに無い
+    how_to_verify: 現地で卓数と席数を数える

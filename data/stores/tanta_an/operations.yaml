@@ -1,0 +1,23 @@
+rules:
+  value:
+  - id: current
+    effective_from: '2022-12-20'
+    effective_to: null
+    open_weekdays:
+    - mon
+    - tue
+    - wed
+    - thu
+    - fri
+    - sat
+    - sun
+    open_on_holidays: true
+    lunch:
+      open: '11:00'
+      close: '15:00'
+      last_order: '14:30'
+      last_entry: '14:30'
+  unit: rules
+  status: OBSERVED
+  observation_id: OBS-001
+  note: POS の決済時刻の範囲から置いた。夜の営業はデータに無い
