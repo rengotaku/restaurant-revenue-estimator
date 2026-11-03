@@ -344,6 +344,8 @@ def test_tc_f7_02(client: TestClient) -> None:
 
     page = client.get(f"/stores/birdman_tamachi/revenue?run={run_id}&tax=ex")
     assert page.status_code == 200, page.text
+    assert "実績との比較" in page.text
+    assert "実績が未投入です" in page.text
 
     rows = _parse_html_table(page.text, required_header="昼")
     assert rows, "売上内訳の表が存在すること"
@@ -917,7 +919,11 @@ def test_lost_lunch_weighted_daily_average_with_unequal_weekdays() -> None:
         overrides={
             "lunch_stay_ratio_by_group_size": {1: 1, 2: 1, 3: 1, 4: 1},
             "lunch_arrival_weekday_factor": {
-                "mon": 1, "tue": 1, "wed": 1, "thu": 1, "fri": 1
+                "mon": 1,
+                "tue": 1,
+                "wed": 1,
+                "thu": 1,
+                "fri": 1,
             },
         },
     )

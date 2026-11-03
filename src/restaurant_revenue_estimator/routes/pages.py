@@ -28,6 +28,7 @@ from restaurant_revenue_estimator.repositories.scenario_repo import (
     ScenarioRepository,
     is_default_run,
 )
+from restaurant_revenue_estimator.services.backtest_view import build_backtest_view
 from restaurant_revenue_estimator.services.evaluation import (
     EvaluationRequest,
     floor1_table_counts,
@@ -411,12 +412,20 @@ def store_revenue(
         )
 
     resolved_run_id = selected_run.id if selected_run else run
+    backtest = build_backtest_view(
+        store_dir=data_directory() / "stores" / store_id,
+        days=result.get("days") or [],
+        scenario=str(result.get("assumption_set") or "standard"),
+        variant=str(result.get("name") or ""),
+        store_id=store_id,
+    )
 
     return _render(
         request,
         "stores/revenue.html",
         store_id=store_id,
         result=result,
+        backtest=backtest,
         variants=variants,
         months=months,
         table_rows=table_rows,
