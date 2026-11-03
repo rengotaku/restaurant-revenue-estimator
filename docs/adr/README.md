@@ -13,3 +13,4 @@
 | [0007](0007-code-hash-in-run-reuse.md) | 保存済みの実行結果を再利用する判定に、計算コードのハッシュを足す | accepted | 2026-11-01 | runs に計算コードの sha256 を保存し、同じ入力・seed・replications でもコードが違えば再利用せず計算し直す |
 | [0008](0008-all-variants-and-three-scenarios-per-run.md) | 1 回の実行で未確定の候補をすべて計算し、悲観・標準・楽観を同じ条件で回す | accepted | 2026-11-01 | 実行のたびに UNRESOLVED の候補の組合せ（variant）をすべて評価し、悲観・標準・楽観を同じ seed・replications で回して result.json の variants と scenarios に入れる |
 | [0009](0009-reuse-evaluations-in-tests.md) | 画面系のテストでは、同じ条件の評価結果を使い回して CI を短くする | accepted | 2026-11-01 | tests/eval_cache.py の CachedEvaluate で、対象のテストファイルでは同じ条件の evaluate の結果を 1 回目のものを deepcopy して返す |
+| [0010](0010-backtest-against-pos-actuals.md) | 実績（POS）は店舗ディレクトリの actuals に置き、日次売上だけでシナリオと突き合わせる | accepted | 2026-11-03 | 実績は data/stores/<store_id>/actuals/ に CSV とメタ情報で置き、rre backtest が日次売上（税込）だけで MAE・バイアス・相対誤差を出す。3 シナリオは予測区間にしないため被覆率は出さない |

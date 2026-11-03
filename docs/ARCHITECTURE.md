@@ -17,7 +17,7 @@
 ```text
 data/stores/<store_id>/*.yaml   事実・観察・仮定（git で版管理。画面からは書き換えない）
 data/calendars/*.csv            内閣府の祝日 CSV（同梱）
-data/benchmarks/*.yaml          公庫の経営指標（照合用）
+data/benchmarks/*.yaml          公庫の経営指標・POS の参考値（照合用）
         │
         v
 [inputs]   読み込み・スキーマ検証・店舗同一性チェック・シナリオ上書きの適用
@@ -28,7 +28,7 @@ data/benchmarks/*.yaml          公庫の経営指標（照合用）
         v
 [services/evaluation.py]  入力ハッシュ・seed・モデル版を付けて 1 回の評価を実行する
         │
-        ├──> [cli]    rre validate / rre run / rre report
+        ├──> [cli]    rre validate / rre run / rre report / rre backtest
         ├──> [report] Markdown + JSON の評価レポート
         └──> [web]    FastAPI + Jinja2 + Alpine.js 画面 ──> SQLite（シナリオと実行履歴だけ）
 ```
@@ -118,6 +118,7 @@ data/
     observations.yaml # 現地観察（時刻範囲・階・内容）
     assumptions/{pessimistic,standard,optimistic}.yaml
     legacy/v5.yaml    # 過去の試算（再現・不整合検知用。実績として扱わない）
+    actuals/          # 実績（POS）。*.csv + actuals.meta.yaml（出所・ライセンス・欠測）。入力 YAML とは別（ADR 0010）
 ```
 
 - ページ本文は保存しない。保存するのは抜き出した事実・URL・取得日だけ（spec 4.1、9.4 末尾）
@@ -224,6 +225,13 @@ spec 6.1 の恒等式。守ること:
 - 感度: ASSUMPTION と UNRESOLVED の各入力を 1 つずつ low/high（UNRESOLVED は各候補）に振り、年間売上と事業所得相当の振れ幅で並べる。上位から「次に調べるべきもの」として出す（spec 1.1-7、12 章）。行ごとに、基準の候補の 3 つの軸をすべて固定して 1 候補だけを計算する
 - 相関付きモンテカルロと P10–P90 表示は、実績で校正できるまで出さない（spec 6.10）
 
+### 5.8 実績との比較（actuals/, `rre backtest`）
+
+- `data/stores/<store_id>/actuals/` の日次売上（税込）と、`rre run` の `result.json` の日次売上を突き合わせる（[ADR 0010](adr/0010-backtest-against-pos-actuals.md)）
+- 比較するのは重なる日だけ。指標は MAE・中央値絶対誤差・バイアス（予測 − 実績）・相対誤差（合計）
+- 悲観・標準・楽観の 3 シナリオは予測区間ではないので、**区間被覆率は出さない**。replications の分布を日次で保存してから足す
+- 実績は入力（事実・仮定）に混ぜない。`ProvenancedValue` の検査対象にもしない
+
 ## 6. 出力
 
 ### 6.1 評価レポート（report）
@@ -297,6 +305,6 @@ API（画面から呼ぶ）:
 ## 8. MVP の対象外
 
 - 外部サイト・API からの自動収集（spec 4 章の利用条件を満たす確認が先。[ADR 0001](adr/0001-scenario-calculator-with-manual-inputs.md)）
-- 実績データによる精度検証（spec Phase F）
+- 実績データによる精度検証の本番運用（受け口と突合は `rre backtest` で実装済み。対象店舗の実績が揃ってから）
 - 税引後手取りの計算
 - 相関付きモンテカルロ・確率的な区間表示

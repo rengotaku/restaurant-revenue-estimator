@@ -8,6 +8,14 @@ from typing import Annotated
 import typer
 
 from restaurant_revenue_estimator import __version__
+from restaurant_revenue_estimator.actuals import (
+    ActualsError,
+    BacktestError,
+    compare,
+    load_actuals,
+    load_predicted_days,
+    render_markdown,
+)
 from restaurant_revenue_estimator.engine.observation import fit_grid
 from restaurant_revenue_estimator.engine.tables import Table
 from restaurant_revenue_estimator.inputs import load_store, validate_all, validate_store
@@ -197,6 +205,47 @@ def report(
         render_run_markdown(document, inputs, benchmark=benchmark), encoding="utf-8"
     )
     typer.echo(str(run_dir / "report.md"))
+
+
+@app.command()
+def backtest(
+    store_dir: Annotated[
+        Path, typer.Argument(help="data/stores/<store_id> のディレクトリ")
+    ],
+    run_json: Annotated[
+        Path, typer.Option("--run", help="rre run が書いた result.json")
+    ],
+    scenario: Annotated[
+        str, typer.Option("--scenario", help="standard / pessimistic / optimistic")
+    ] = "standard",
+    variant: Annotated[
+        str | None, typer.Option("--variant", help="variant 名（未指定なら先頭）")
+    ] = None,
+    as_json: Annotated[bool, typer.Option("--json", help="JSON で出す")] = False,
+    out: Annotated[
+        Path | None, typer.Option("--out", help="Markdown を書き出す")
+    ] = None,
+) -> None:
+    """実績（POS）とシナリオの日次売上を突き合わせる."""
+    try:
+        actual = load_actuals(store_dir)
+        predicted = load_predicted_days(run_json, scenario=scenario, variant=variant)
+        result = compare(actual, predicted)
+    except (ActualsError, BacktestError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+
+    if as_json:
+        typer.echo(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
+        return
+
+    text = render_markdown(result)
+    if out is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(text, encoding="utf-8")
+        typer.echo(str(out))
+        return
+    typer.echo(text)
 
 
 @app.command("fit-observation")

@@ -1,0 +1,27 @@
+benchmark_id: pos_reference_niseko_2023
+name: 北海道オープンデータ「レストラン売上データ」（Tanta an・ニセコ）
+source:
+  id: S21
+  url: https://www.harp.lg.jp/opendata/dataset/1938.html
+  accessed_at: 2026-11-03
+definition_note: >-
+  ニセコ東急グラン・ヒラフのレストラン 1 店舗のモバイルオーダー分。
+  2022-12-20〜2023-02-28 の 71 日、実売上のみ（キャンセル・仮売上・現金支払は除く）。
+  ランチのみ（9〜15 時）。金額が税込か税抜かはデータに明記が無い。
+  ライセンスは CC BY。このシステムの入力には使わず、仮定のレンジを置くときの参考値として持つ。
+metrics:
+  average_ticket_inc_tax:
+    label: 客単価（会計あたり）
+    value: 4375
+    unit: yen
+    note: 41,797,100 円 ÷ 9,553 会計。1 会計あたりの人数は不明
+  daily_revenue_median_inc_tax:
+    label: 日商の中央値
+    value: 597000
+    unit: yen
+    note: 71 日。平均 588,692 円、最小 374,860 円、最大 828,100 円
+  daytime_share_11_14:
+    label: 11〜14 時の売上構成比
+    value: 0.949
+    unit: ratio
+    note: 11〜15 時では 0.989。ランチのみの業態
